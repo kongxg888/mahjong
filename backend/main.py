@@ -1,54 +1,46 @@
 """
-main.py - FastAPI application entry point for the Mahjong game.
-
-Run with:
-  cd backend
-  uvicorn main:app --reload --host 0.0.0.0 --port 8000
+永温麻将 FastAPI 入口
 """
-
-import sys
-import os
-
-# Ensure the backend directory is on the Python path so that
-# `from game.xxx import ...` and `from api.xxx import ...` work correctly.
-sys.path.insert(0, os.path.dirname(__file__))
-
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.responses import RedirectResponse
 from api.routes import router as rest_router
+from api.routes_admin import router as admin_router
 from api.websocket import router as ws_router
+import os
 
-app = FastAPI(title="Mahjong Game")
+app = FastAPI(title="永温麻将")
 
-# ---------------------------------------------------------------------------
-# CORS – allow all origins during development
-# ---------------------------------------------------------------------------
+# CORS（允许前端开发访问）
+from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------------------------------------------------------------------------
-# REST API routes  →  /api/...
-# ---------------------------------------------------------------------------
 app.include_router(rest_router, prefix="/api")
-
-# ---------------------------------------------------------------------------
-# WebSocket routes  →  /ws/...
-# ---------------------------------------------------------------------------
+app.include_router(admin_router, prefix="/api/admin")
 app.include_router(ws_router)
 
-# ---------------------------------------------------------------------------
-# Serve frontend static files  →  /
-# ---------------------------------------------------------------------------
-_frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
-if os.path.isdir(_frontend_dir):
-    app.mount(
-        "/",
-        StaticFiles(directory=_frontend_dir, html=True),
-        name="frontend",
-    )
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+# 前端静态文件
+import os
+backend_dir = os.path.dirname(os.path.abspath(__file__))  # .../wenzhou_mahjong/backend
+project_dir = os.path.dirname(backend_dir)               # .../wenzhou_mahjong
+frontend_path = os.path.join(project_dir, "frontend")
+if os.path.exists(frontend_path):
+    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+
+@app.get("/")
+async def root():
+    """重定向到前端"""
+    return RedirectResponse(url="/static/index.html")

@@ -27,6 +27,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import uuid
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -661,6 +663,33 @@ async def _handle_game_over(room_id: str) -> None:
     }
     await _broadcast(room_id, payload)
     await _broadcast_room_update()
+
+    # Persist to game history for admin dashboard
+    try:
+        from api.routes_admin import register_game_to_history
+        game_record = {
+            "id": str(uuid.uuid4()),
+            "room_id": room_id,
+            "room_name": room.name,
+            "finished_at": datetime.utcnow().isoformat(),
+            "winner_id": winner_id,
+            "winner_idx": winner_idx,
+            "scores": scores,
+            "chip_changes": dict(room.last_chip_changes),
+            "cumulative_scores": dict(room.cumulative_scores),
+            "round_number": room.round_number,
+            "han_breakdown": gs.han_breakdown if gs else [],
+            "han_total": gs.han_total if gs else 0,
+            "win_ron": gs.win_ron,
+            "players": [{"id": p.id, "is_ai": p.is_ai} for p in gs.players],
+        }
+        register_game_to_history(game_record)
+        # Also upsert player registry
+        from api.routes_admin import upsert_player
+        for pid in scores:
+            upsert_player(pid)
+    except Exception:
+        pass  # non-critical — don't let history storage break gameplay
 
 
 # ---------------------------------------------------------------------------
