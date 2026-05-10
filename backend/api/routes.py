@@ -14,12 +14,12 @@ from typing import Optional
 
 from game.room_manager import RoomManager
 
-router = APIRouter()
+router = APIRouter(prefix="/api", tags=["api"])
 
 # ---------------------------------------------------------------------------
-# Shared singleton – imported by websocket.py as well
+# Shared singleton – must match the instance used by websocket.py
 # ---------------------------------------------------------------------------
-room_manager = RoomManager()
+from api.websocket import room_manager
 
 
 # ---------------------------------------------------------------------------
@@ -49,6 +49,14 @@ def list_rooms():
 def create_room(body: CreateRoomRequest = CreateRoomRequest()):
     """Create a new room and return its info."""
     room = room_manager.create_room(name=body.name)
+    return room.to_dict()
+
+
+@router.get("/rooms/{room_id}")
+def get_room_info(room_id: str):
+    room = room_manager.get_room(room_id)
+    if room is None:
+        raise HTTPException(status_code=404, detail="Room not found")
     return room.to_dict()
 
 

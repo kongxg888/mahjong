@@ -35,13 +35,33 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from game.game_state import GameState
 from game.ai_player import AIPlayer
-from game.room_manager import Room, INITIAL_CHIPS
-# Import the singleton room_manager from routes
-from api.routes import room_manager
+from game.room_manager import Room, RoomManager, INITIAL_CHIPS
+# room_manager is created in main.py and imported here to avoid circular imports
+
+
+def create_token(player_id: str) -> str:
+    """Create a simple bearer token for a player."""
+    import base64, json
+    payload = json.dumps({"player_id": player_id, "time": datetime.now().isoformat()})
+    return base64.urlsafe_b64encode(payload.encode()).decode()
+
+
+def verify_token(token: str) -> str | None:
+    """Verify a bearer token, return player_id or None."""
+    import base64
+    try:
+        payload = base64.urlsafe_b64decode(token.encode()).decode()
+        data = json.loads(payload)
+        return data.get("player_id")
+    except Exception:
+        return None
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Singleton room_manager — used by both websocket handlers and REST routes
+room_manager = RoomManager()
 
 # ---------------------------------------------------------------------------
 # Connection registry
@@ -664,32 +684,40 @@ async def _handle_game_over(room_id: str) -> None:
     await _broadcast(room_id, payload)
     await _broadcast_room_update()
 
-    # Persist to game history for admin dashboard
+    # Persist to SQLite for admin dashboard
     try:
-        from api.routes_admin import register_game_to_history
-        game_record = {
-            "id": str(uuid.uuid4()),
-            "room_id": room_id,
-            "room_name": room.name,
-            "finished_at": datetime.utcnow().isoformat(),
-            "winner_id": winner_id,
-            "winner_idx": winner_idx,
-            "scores": scores,
-            "chip_changes": dict(room.last_chip_changes),
-            "cumulative_scores": dict(room.cumulative_scores),
-            "round_number": room.round_number,
-            "han_breakdown": gs.han_breakdown if gs else [],
-            "han_total": gs.han_total if gs else 0,
-            "win_ron": gs.win_ron,
-            "players": [{"id": p.id, "is_ai": p.is_ai} for p in gs.players],
-        }
-        register_game_to_history(game_record)
-        # Also upsert player registry
-        from api.routes_admin import upsert_player
-        for pid in scores:
-            upsert_player(pid)
-    except Exception:
-        pass  # non-critical — don't let history storage break gameplay
+        from api import database
+        game_id = str(uuid.uuid4())
+        win_type = "rong" if gs.win_ron else ("zimo" if gs.win_ron is False else "draw")
+        database.save_game(
+            game_id=game_id,
+            room_id=room_id,
+            room_name=room.name,
+            winner_id=winner_id or "",
+            winner_name=gs.players[winner_idx].name if winner_idx is not None else "",
+            win_type=win_type,
+            final_scores=scores,
+            chip_changes=dict(room.last_chip_changes),
+            han_details=gs.han_breakdown if gs else [],
+            total_rounds=room.round_number,
+        )
+        # Save per-player data
+        for i, p in enumerate(gs.players):
+            database.save_game_participant(
+                game_id=game_id,
+                player_id=p.id,
+                player_name=p.name or p.id,
+                final_score=scores.get(p.id, 0),
+                chip_change=room.last_chip_changes.get(p.id, 0),
+                is_winner=(i == winner_idx),
+                hand_tiles=list(p.hand),
+                melds=[list(m) for m in p.melds],
+            )
+        # Update player chips in DB
+        for pid, chips in room.cumulative_scores.items():
+            database.update_player(pid, chips=chips)
+    except Exception as e:
+        logger.warning("Failed to persist game history: %s", e)
 
 
 # ---------------------------------------------------------------------------

@@ -11,6 +11,10 @@ import os
 
 app = FastAPI(title="永温麻将")
 
+# Singleton room_manager — shared by websocket.py and routes.py
+from game.room_manager import RoomManager
+room_manager = RoomManager()
+
 # CORS（允许前端开发访问）
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
@@ -21,8 +25,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(rest_router, prefix="/api")
-app.include_router(admin_router, prefix="/api/admin")
+app.include_router(rest_router)    # prefix="/api" already defined in routes.py
+app.include_router(admin_router)  # prefix="/api/admin" already defined in routes_admin.py
 app.include_router(ws_router)
 
 

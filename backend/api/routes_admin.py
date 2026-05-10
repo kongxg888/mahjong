@@ -18,8 +18,10 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import jwt
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel
+
+from . import database, models
 
 # ---------------------------------------------------------------------------
 # Config
@@ -30,7 +32,7 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 12
 
-router = APIRouter()
+router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 # ---------------------------------------------------------------------------
@@ -44,53 +46,13 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     token: str
-    expires_in: int  # seconds
+    expires_in: int
 
 
 class TokenPayload(BaseModel):
-    sub: str          # username
-    exp: int          # unix timestamp
+    sub: str
+    exp: int
     iat: int
-
-
-# ---------------------------------------------------------------------------
-# Shared in-memory stores (same process as room_manager)
-# ---------------------------------------------------------------------------
-# Filled by the WebSocket handler when a game ends.
-# In production this would be a real database.
-_game_history: list[dict] = []
-_player_registry: dict[str, dict] = {}   # player_id → {chips, status, note, last_seen}
-
-
-def register_game_to_history(game_record: dict) -> None:
-    """Called by websocket.py when a game ends — stores the record."""
-    _game_history.insert(0, game_record)  # newest first
-    # Keep last 500 records
-    if len(_game_history) > 500:
-        _game_history[:] = _game_history[:500]
-
-
-def upsert_player(player_id: str, **kwargs) -> None:
-    """Create or update a player record."""
-    if player_id not in _player_registry:
-        _player_registry[player_id] = {
-            "id": player_id,
-            "chips": kwargs.get("chips", 1000),
-            "status": "active",
-            "note": "",
-            "last_seen": datetime.utcnow().isoformat(),
-            "total_games": 0,
-            "total_wins": 0,
-        }
-    for k, v in kwargs.items():
-        if k in ("chips", "status", "note"):
-            _player_registry[player_id][k] = v
-    if "last_seen" in kwargs or True:
-        _player_registry[player_id]["last_seen"] = datetime.utcnow().isoformat()
-
-
-def get_all_players() -> list[dict]:
-    return list(_player_registry.values())
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +60,6 @@ def get_all_players() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def _make_token(username: str) -> tuple[str, int]:
-    """Generate a JWT and return (token, expires_in_seconds)."""
     now = int(time.time())
     payload = {
         "sub": username,
@@ -110,7 +71,6 @@ def _make_token(username: str) -> tuple[str, int]:
 
 
 def _verify_token(authorization: str) -> TokenPayload:
-    """Validate Bearer token and return payload. Raises HTTPException on failure."""
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing Bearer token")
     token = authorization[7:]
@@ -124,7 +84,6 @@ def _verify_token(authorization: str) -> TokenPayload:
 
 
 def _require_auth(authorization: str = Header(...)) -> TokenPayload:
-    """Dependency: verify admin token or raise 401."""
     return _verify_token(authorization)
 
 
@@ -134,7 +93,6 @@ def _require_auth(authorization: str = Header(...)) -> TokenPayload:
 
 @router.post("/login", response_model=LoginResponse)
 def admin_login(body: LoginRequest):
-    """Verify credentials and return a JWT."""
     if body.username != ADMIN_USERNAME or body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token, expires_in = _make_token(body.username)
@@ -145,35 +103,18 @@ def admin_login(body: LoginRequest):
 # Dashboard stats
 # ---------------------------------------------------------------------------
 
-class DashboardStats(BaseModel):
-    total_players: int
-    total_games: int
-    active_rooms: int
-    total_online: int
-
-
-@router.get("/stats", response_model=DashboardStats)
-def dashboard_stats(_: TokenPayload = None):
-    """Quick KPI summary for the dashboard."""
-    from api.routes import room_manager
-    active = sum(1 for r in room_manager.get_rooms() if r.status == "playing")
-    return DashboardStats(
-        total_players=len(_player_registry),
-        total_games=len(_game_history),
-        active_rooms=active,
-        total_online=_sum_online(),
-    )
-
-
-def _sum_online() -> int:
-    """Approximate online count: human players in active rooms + waiting rooms."""
-    from api.routes import room_manager
-    seen: set[str] = set()
-    for room in room_manager.get_rooms():
-        for pid in room.human_players:
-            if not pid.startswith("ai_player_"):
-                seen.add(pid)
-    return len(seen)
+@router.get("/stats")
+def dashboard_stats(___: TokenPayload = Depends(_require_auth)):
+    stats = database.admin_get_stats()
+    # 在线人数从 websocket.py 的 room_manager 获取
+    try:
+        from api.routes import room_manager
+        rooms = room_manager.get_rooms()
+        total_online = sum(1 for r in rooms if isinstance(r, dict) and r.get("status") == "playing")
+        stats["total_online"] = total_online
+    except Exception:
+        stats["total_online"] = stats.get("active_rooms", 0)
+    return stats
 
 
 # ---------------------------------------------------------------------------
@@ -181,80 +122,78 @@ def _sum_online() -> int:
 # ---------------------------------------------------------------------------
 
 @router.get("/rooms")
-def list_admin_rooms(_: TokenPayload = None):
-    """All rooms including ended ones."""
-    from api.routes import room_manager
-    rooms = room_manager.get_rooms()
-    return [_room_detail(r) for r in rooms]
+def list_admin_rooms(
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    ___: TokenPayload = Depends(_require_auth),
+):
+    rooms, total = database.list_rooms(status=status, search=search,
+                                        limit=limit, offset=offset)
+    return {"rooms": rooms, "total": total, "limit": limit, "offset": offset}
 
 
 class RoomUpdateRequest(BaseModel):
     name: Optional[str] = None
-    status: Optional[str] = None   # "waiting" | "playing" | "ended"
-    chips: Optional[int] = None     # set initial chips for all players
+    status: Optional[str] = None
+    initial_chips: Optional[int] = None
 
 
 @router.patch("/rooms/{room_id}")
-def update_room(room_id: str, body: RoomUpdateRequest, _: TokenPayload = None):
-    from api.routes import room_manager
-    room = room_manager.get_room(room_id)
-    if room is None:
+def update_room(room_id: str, body: RoomUpdateRequest, ___: TokenPayload = Depends(_require_auth)):
+    room = database.get_room(room_id)
+    if not room:
         raise HTTPException(status_code=404, detail="Room not found")
-    if body.name is not None:
-        room.name = body.name
-    if body.status is not None:
-        if body.status not in ("waiting", "playing", "ended"):
-            raise HTTPException(status_code=400, detail="Invalid status")
-        room.status = body.status
-    if body.chips is not None:
-        from game.room_manager import INITIAL_CHIPS
-        for pid in room.human_players:
-            room.cumulative_scores[pid] = body.chips
-        # also reset AI player scores
-        if room.game_state:
-            for p in room.game_state.players:
-                if p.id.startswith("ai_player_"):
-                    room.cumulative_scores[p.id] = body.chips
-    return _room_detail(room)
+    updated = database.update_room(
+        room_id,
+        name=body.name,
+        status=body.status,
+    )
+    return updated
 
 
 @router.post("/rooms/{room_id}/close")
-def close_room(room_id: str, _: TokenPayload = None):
-    """Force-close a room (set status to ended)."""
-    from api.routes import room_manager
-    room = room_manager.get_room(room_id)
-    if room is None:
+def close_room(room_id: str, ___: TokenPayload = Depends(_require_auth)):
+    room = database.get_room(room_id)
+    if not room:
         raise HTTPException(status_code=404, detail="Room not found")
-    room.status = "ended"
+    database.update_room(room_id, status="ended")
     return {"ok": True, "room_id": room_id}
 
 
 @router.post("/rooms/{room_id}/reopen")
-def reopen_room(room_id: str, _: TokenPayload = None):
-    """Reopen an ended room (set back to waiting)."""
-    from api.routes import room_manager
-    room = room_manager.get_room(room_id)
-    if room is None:
+def reopen_room(room_id: str, ___: TokenPayload = Depends(_require_auth)):
+    room = database.get_room(room_id)
+    if not room:
         raise HTTPException(status_code=404, detail="Room not found")
-    if room.status not in ("ended", "waiting"):
-        raise HTTPException(status_code=400, detail="Can only reopen ended or waiting rooms")
-    room.status = "waiting"
-    room.game_state = None
+    database.update_room(room_id, status="waiting")
     return {"ok": True, "room_id": room_id}
 
 
-def _room_detail(room) -> dict:
-    return {
-        "id": room.id,
-        "name": room.name,
-        "status": room.status,
-        "player_count": room.player_count,
-        "max_players": room.max_players if hasattr(room, "max_players") else 4,
-        "created_at": room.created_at.isoformat() if hasattr(room, "created_at") else "",
-        "round_number": room.round_number,
-        "cumulative_scores": dict(room.cumulative_scores),
-        "human_players": room.human_players,
-    }
+@router.post("/rooms/{room_id}/start")
+def admin_start_room(room_id: str, ___: TokenPayload = Depends(_require_auth)):
+    """手动开局：等待中的房间，手动开始游戏"""
+    room = database.get_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    if room["status"] != "waiting":
+        raise HTTPException(status_code=400, detail="只能对等待中的房间开局")
+    updated = database.update_room(room_id, status="playing")
+    return {"ok": True, "room": updated}
+
+
+@router.post("/rooms/{room_id}/force_end")
+def force_end_room(room_id: str, ___: TokenPayload = Depends(_require_auth)):
+    """强制结束：进行中的房间，强制终止游戏，重置房间状态"""
+    room = database.get_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    if room["status"] == "ended":
+        raise HTTPException(status_code=400, detail="房间已结束，无需强制结束")
+    # 重置游戏状态：改为 waiting，人数归零，局数归零
+    updated = database.update_room(room_id, reset_game=True)
+    return {"ok": True, "room": updated}
 
 
 # ---------------------------------------------------------------------------
@@ -262,41 +201,102 @@ def _room_detail(room) -> dict:
 # ---------------------------------------------------------------------------
 
 @router.get("/players")
-def list_players(_: TokenPayload = None):
-    players = get_all_players()
-    return {
-        "players": players,
-        "total": len(players),
-    }
+def list_players(
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    ___: TokenPayload = Depends(_require_auth),
+):
+    players, total = database.list_players(status=status, search=search,
+                                           limit=limit, offset=offset)
+    # 补充战绩数据
+    result = []
+    for p in players:
+        stats = database.get_player_game_stats(p["id"])
+        result.append({**p, **stats})
+    return {"players": result, "total": total, "limit": limit, "offset": offset}
 
 
 class PlayerUpdateRequest(BaseModel):
     chips: Optional[int] = None
-    status: Optional[str] = None   # "active" | "banned"
+    status: Optional[str] = None
     note: Optional[str] = None
+    name: Optional[str] = None
 
 
 @router.patch("/players/{player_id}")
-def update_player(player_id: str, body: PlayerUpdateRequest, _: TokenPayload = None):
-    if player_id not in _player_registry:
+def update_player(player_id: str, body: PlayerUpdateRequest, ___: TokenPayload = Depends(_require_auth)):
+    player = database.get_player(player_id)
+    if not player:
         raise HTTPException(status_code=404, detail="Player not found")
-    if body.status is not None and body.status not in ("active", "banned"):
+    # normal -> active (统一命名)
+    effective_status = body.status
+    if effective_status == "normal":
+        effective_status = "active"
+    if effective_status is not None and effective_status not in ("active", "frozen", "banned"):
         raise HTTPException(status_code=400, detail="Invalid status")
-    record = _player_registry[player_id]
-    if body.chips is not None:
-        record["chips"] = body.chips
-    if body.status is not None:
-        record["status"] = body.status
-    if body.note is not None:
-        record["note"] = body.note
-    return record
+    updated = database.update_player(
+        player_id,
+        chips=body.chips,
+        status=effective_status,
+        note=body.note if body.note and body.note.strip() else None,
+        name=body.name if body.name and body.name.strip() else None,
+    )
+    return updated
+
+
+@router.post("/players/{player_id}/reset-chips")
+def reset_chips(player_id: str, amount: int = 10000, ___: TokenPayload = Depends(_require_auth)):
+    """重置玩家筹码到指定数额（默认10000）。"""
+    player = database.get_player(player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    updated = database.reset_player_chips(player_id, amount)
+    return {"ok": True, "player": updated}
 
 
 @router.get("/players/{player_id}")
-def get_player(player_id: str, _: TokenPayload = None):
-    if player_id not in _player_registry:
+def get_player(player_id: str, ___: TokenPayload = Depends(_require_auth)):
+    player = database.get_player(player_id)
+    if not player:
         raise HTTPException(status_code=404, detail="Player not found")
-    return _player_registry[player_id]
+    stats = database.get_player_game_stats(player_id)
+    return {**player, **stats}
+
+
+class CreatePlayerRequest(BaseModel):
+    phone: str
+    name: str = ""
+    chips: int = 10000
+
+
+@router.post("/players")
+def create_player_endpoint(body: CreatePlayerRequest, ___: TokenPayload = Depends(_require_auth)):
+    if not body.phone.strip():
+        raise HTTPException(status_code=400, detail="手机号不能为空")
+    if len(body.phone) < 11:
+        raise HTTPException(status_code=400, detail="手机号格式不正确")
+    try:
+        player = database.create_player(
+            phone=body.phone.strip(),
+            name=body.name.strip() if body.name else "",
+            chips=body.chips,
+        )
+        return {"ok": True, "player": player}
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.delete("/players/{player_id}")
+def delete_player_endpoint(player_id: str, ___: TokenPayload = Depends(_require_auth)):
+    player = database.get_player(player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    ok = database.delete_player(player_id)
+    if not ok:
+        raise HTTPException(status_code=500, detail="删除失败")
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -305,24 +305,32 @@ def get_player(player_id: str, _: TokenPayload = None):
 
 @router.get("/games")
 def list_games(
-    limit: int = 50,
+    room_id: Optional[str] = None,
+    winner_id: Optional[str] = None,
+    limit: int = 20,
     offset: int = 0,
-    _: TokenPayload = None,
+    ___: TokenPayload = Depends(_require_auth),
 ):
-    """Paginated game history, newest first."""
-    total = len(_game_history)
-    records = _game_history[offset : offset + limit]
-    return {
-        "games": records,
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-    }
+    games, total = database.list_games(room_id=room_id, winner_id=winner_id,
+                                        limit=limit, offset=offset)
+    return {"games": games, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/games/{game_id}")
-def get_game(game_id: str, _: TokenPayload = None):
-    for g in _game_history:
-        if g.get("id") == game_id:
-            return g
-    raise HTTPException(status_code=404, detail="Game not found")
+def get_game(game_id: int, ___: TokenPayload = Depends(_require_auth)):
+    game = database.get_game(game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="对局不存在")
+    return dict(game)
+
+
+@router.get("/games/{game_id}/participants")
+def get_game_participants(game_id: int, ___: TokenPayload = Depends(_require_auth)):
+    rows = database.get_game_participants(game_id)
+    return rows
+
+
+@router.get("/games/{game_id}/han")
+def get_game_han(game_id: int, ___: TokenPayload = Depends(_require_auth)):
+    rows = database.get_game_han(game_id)
+    return {"han": rows}

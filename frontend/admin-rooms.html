@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>房间列表 — 雀巢 Mahjong 管理后台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base:        #18261E;
+      --bg-base-alt:    #1a2e22;
+      --gold:           #D4AF37;
+      --gold-light:     #E8C962;
+      --gold-dim:       rgba(212,175,55,0.12);
+      --gold-border:    rgba(212,175,55,0.28);
+      --gold-glow:     rgba(212,175,55,0.22);
+      --ink:            #F5F5DC;
+      --ink-muted:      rgba(245,245,220,0.68);
+      --ink-faint:      rgba(255,255,255,0.40);
+      --glass-bg:       rgba(0,0,0,0.42);
+      --glass-bg-card:  rgba(0,0,0,0.35);
+      --glass-border:   rgba(212,175,55,0.28);
+      --glass-blur:     blur(10px) saturate(140%);
+      --panel-bg:       rgba(0,0,0,0.50);
+      --panel-border:   rgba(212,175,55,0.15);
+      --radius-sm:   6px;
+      --radius-md:  12px;
+      --radius-lg:  18px;
+      --radius-xl:  24px;
+      --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --duration-fast:   120ms;
+      --duration-normal: 220ms;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: 'Inter', 'Noto Sans SC', -apple-system, sans-serif;
+      background-color: var(--bg-base);
+      background-image: radial-gradient(rgba(212,175,55,0.06) 1px, transparent 1px);
+      background-size: 26px 26px;
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      -webkit-font-smoothing: antialiased;
+    }
+    .sidebar {
+      width: 240px; flex-shrink: 0;
+      background: rgba(0,0,0,0.55);
+      border-right: 1px solid var(--panel-border);
+      display: flex; flex-direction: column;
+      position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    }
+    .sidebar-brand { display:flex; align-items:center; gap:12px; padding:24px 20px 20px; border-bottom:1px solid rgba(255,255,255,0.06); }
+    .sidebar-brand-icon { width:40px;height:40px;background:linear-gradient(135deg,rgba(212,175,55,0.20),rgba(212,175,55,0.08));border:1px solid rgba(212,175,55,0.30);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0; }
+    .sidebar-brand-text { display:flex;flex-direction:column; }
+    .sidebar-brand-name { font-family:'Noto Serif SC',serif;font-size:1rem;font-weight:900;color:var(--gold);letter-spacing:0.08em;line-height:1; }
+    .sidebar-brand-sub { font-size:0.65rem;color:var(--ink-muted);letter-spacing:0.1em;text-transform:uppercase;margin-top:3px; }
+    .sidebar-nav { padding:16px 12px;flex:1;display:flex;flex-direction:column;gap:4px; }
+    .nav-section-label { font-size:0.62rem;font-weight:700;color:var(--ink-faint);letter-spacing:0.12em;text-transform:uppercase;padding:8px 8px 4px; }
+    .nav-item { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-md);color:var(--ink-muted);text-decoration:none;font-size:0.85rem;font-weight:500;transition:background var(--duration-fast),color var(--duration-fast);cursor:pointer;border:none;background:none;width:100%;text-align:left; }
+    .nav-item:hover { background:rgba(255,255,255,0.06);color:var(--ink); }
+    .nav-item.active { background:var(--gold-dim);color:var(--gold);border:1px solid rgba(212,175,55,0.20); }
+    .nav-item svg { flex-shrink:0;opacity:0.7; }
+    .nav-item.active svg { opacity:1; }
+    .sidebar-footer { padding:16px 12px;border-top:1px solid rgba(255,255,255,0.06); }
+    .admin-user { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-md);background:rgba(255,255,255,0.04); }
+    .admin-avatar { width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold-light));display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:900;color:var(--bg-base);flex-shrink:0; }
+    .admin-info { flex:1;overflow:hidden; }
+    .admin-name { font-size:0.80rem;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .admin-role { font-size:0.65rem;color:var(--ink-muted); }
+    .main { flex:1;min-width:0;display:flex;flex-direction:column; }
+    .topbar { display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:rgba(0,0,0,0.40);border-bottom:1px solid var(--panel-border);position:sticky;top:0;z-index:10; }
+    .topbar-title { font-family:'Noto Serif SC',serif;font-size:1.1rem;font-weight:700;color:var(--gold);letter-spacing:0.06em; }
+    .topbar-actions { display:flex;align-items:center;gap:10px; }
+    .btn { display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0.5rem 1rem;border-radius:var(--radius-md);font-size:0.82rem;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid transparent;transition:all var(--duration-fast) var(--ease-out);white-space:nowrap; }
+    .btn:active:not(:disabled) { transform:scale(0.95); }
+    .btn:disabled { opacity:0.4;cursor:not-allowed; }
+    .btn-gold { background:linear-gradient(135deg,rgba(212,175,55,0.85),rgba(212,175,55,0.70));border-color:var(--gold);color:var(--bg-base);box-shadow:0 3px 12px rgba(212,175,55,0.25); }
+    .btn-gold:hover { background:linear-gradient(135deg,var(--gold),var(--gold-light));box-shadow:0 5px 18px rgba(212,175,55,0.40);transform:translateY(-1px); }
+    .btn-outline { background:transparent;border-color:var(--gold-border);color:var(--gold); }
+    .btn-outline:hover { background:var(--gold-dim); }
+    .btn-ghost { background:transparent;border-color:rgba(255,255,255,0.15);color:var(--ink-muted); }
+    .btn-ghost:hover { background:rgba(255,255,255,0.06);color:var(--ink); }
+    .btn-danger { background:rgba(160,40,40,0.80);border-color:rgba(200,80,80,0.45);color:#ffcccc; }
+    .btn-danger:hover { background:rgba(180,50,50,0.90); }
+    .btn-sm { padding:0.3rem 0.7rem;font-size:0.75rem; }
+    .content { padding:24px 28px;display:flex;flex-direction:column;gap:20px;flex:1; }
+    .toolbar { display:flex;align-items:center;gap:10px;flex-wrap:wrap; }
+    .toolbar-search { display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.30);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-md);padding:0 12px;flex:1;max-width:280px; }
+    .toolbar-search input { background:none;border:none;outline:none;color:var(--ink);font-family:inherit;font-size:0.85rem;padding:8px 0;width:100%; }
+    .toolbar-search input::placeholder { color:var(--ink-faint); }
+    .toolbar-search:focus-within { border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow); }
+    .filter-tabs { display:flex;gap:4px; }
+    .filter-tab { padding:6px 14px;border-radius:var(--radius-full);font-size:0.78rem;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,0.10);background:none;color:var(--ink-muted);transition:all var(--duration-fast); }
+    .filter-tab:hover { background:rgba(255,255,255,0.06); }
+    .filter-tab.active { background:var(--gold-dim);border-color:rgba(212,175,55,0.35);color:var(--gold); }
+    .card { background:var(--glass-bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--radius-lg);box-shadow:0 4px 16px rgba(0,0,0,0.3);overflow:hidden; }
+    .card-header { display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.07); }
+    .card-title { font-size:0.88rem;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px; }
+    .card-title::before { content:'';display:block;width:3px;height:14px;background:var(--gold);border-radius:2px; }
+    .card-body { padding:0; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%;border-collapse:collapse;font-size:0.82rem; }
+    thead th { padding:10px 16px;text-align:left;color:var(--ink-muted);font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.08);white-space:nowrap;background:rgba(0,0,0,0.20); }
+    tbody tr { border-bottom:1px solid rgba(255,255,255,0.05);transition:background var(--duration-fast); }
+    tbody tr:hover { background:rgba(255,255,255,0.04); }
+    tbody td { padding:10px 16px;color:var(--ink);vertical-align:middle; }
+    .badge { display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:var(--radius-full);font-size:0.70rem;font-weight:700;letter-spacing:0.02em;white-space:nowrap; }
+    .badge-green  { background:rgba(60,160,90,0.18);color:#6fcf6f;border:1px solid rgba(60,160,90,0.30); }
+    .badge-gold   { background:rgba(212,175,55,0.15);color:var(--gold);border:1px solid rgba(212,175,55,0.25); }
+    .badge-red    { background:rgba(200,60,60,0.18);color:#eb7474;border:1px solid rgba(200,60,60,0.30); }
+    .badge-grey   { background:rgba(255,255,255,0.08);color:var(--ink-muted);border:1px solid rgba(255,255,255,0.12); }
+    .action-btns { display:flex;gap:6px; }
+    /* Modal */
+    .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.60);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:200;pointer-events:none;opacity:0;transition:opacity var(--duration-normal); }
+    .modal-overlay:not(.hidden) { opacity:1;pointer-events:auto; }
+    .modal-box { background:var(--bg-base-alt);border:1.5px solid var(--gold);border-radius:var(--radius-xl);padding:28px 24px;max-width:480px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 16px 64px rgba(0,0,0,0.75),0 0 40px rgba(212,175,55,0.12);transform:scale(0.95);transition:transform var(--duration-normal) var(--ease-out); }
+    .modal-overlay:not(.hidden) .modal-box { transform:scale(1); }
+    .modal-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:20px; }
+    .modal-title { font-family:'Noto Serif SC',serif;font-size:1.1rem;font-weight:700;color:var(--gold); }
+    .modal-close { background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.2rem;padding:4px;border-radius:var(--radius-sm);transition:color var(--duration-fast); }
+    .modal-close:hover { color:var(--ink); }
+    .form-group { margin-bottom:14px; }
+    .form-label { display:block;font-size:0.72rem;font-weight:700;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px; }
+    .form-input, .form-select { width:100%;padding:8px 12px;background:rgba(0,0,0,0.30);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-md);color:var(--ink);font-family:inherit;font-size:0.85rem;outline:none;transition:border-color var(--duration-fast),box-shadow var(--duration-fast); }
+    .form-input:focus, .form-select:focus { border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow); }
+    .form-input::placeholder { color:var(--ink-faint); }
+    .form-select option { background:#1a2e22;color:var(--ink); }
+    .form-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+    .modal-footer { display:flex;gap:10px;justify-content:flex-end;margin-top:20px; }
+    .toast { position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);color:var(--ink);padding:10px 22px;border-radius:9999px;font-size:0.82rem;z-index:999;pointer-events:none;white-space:nowrap;border:1px solid rgba(212,175,55,0.25);box-shadow:0 4px 16px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s,transform 0.2s; }
+    .toast.show { opacity:1;transform:translateX(-50%) translateY(0); }
+    @media (max-width:768px) { .sidebar{display:none;} .content{padding:16px;} .topbar{padding:12px 16px;} }
+    ::-webkit-scrollbar{width:5px;height:5px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:3px; }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">🀄</div>
+      <div class="sidebar-brand-text">
+        <span class="sidebar-brand-name">雀巢</span>
+        <span class="sidebar-brand-sub">Mahjong Admin</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">概览</div>
+      <a class="nav-item" href="admin-dashboard.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        仪表盘
+      </a>
+      <div class="nav-section-label">运营管理</div>
+      <a class="nav-item active" href="admin-rooms.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        房间列表
+      </a>
+      <a class="nav-item" href="admin-players.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        玩家记录
+      </a>
+      <a class="nav-item" href="admin-games.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        对局记录
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-user">
+        <div class="admin-avatar">管</div>
+        <div class="admin-info">
+          <div class="admin-name">管理员</div>
+          <div class="admin-role">超级管理员</div>
+        </div>
+      </div>
+      <button class="btn btn-secondary" id="btn-logout" style="margin-top:8px;font-size:0.75rem;padding:6px 12px;width:100%;justify-content:center;">退出登录</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <h1 class="topbar-title">房间列表</h1>
+      <div class="topbar-actions">
+        <button class="btn btn-gold btn-sm" id="btn-create-room">+ 新建房间</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="toolbar">
+        <div class="toolbar-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-input" placeholder="搜索房间名或ID…" />
+        </div>
+        <div class="filter-tabs">
+          <button class="filter-tab active" data-filter="all">全部</button>
+          <button class="filter-tab" data-filter="waiting">等待中</button>
+          <button class="filter-tab" data-filter="playing">进行中</button>
+          <button class="filter-tab" data-filter="closed">已关闭</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>房间名</th>
+                  <th>房间ID</th>
+                  <th>状态</th>
+                  <th>当前人数</th>
+                  <th>筹码门槛</th>
+                  <th>创建时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="rooms-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Room Modal -->
+  <div class="modal-overlay hidden" id="edit-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title-text">编辑房间</span>
+        <button class="modal-close" id="modal-close-btn">✕</button>
+      </div>
+      <input type="hidden" id="edit-room-id" />
+      <div class="form-group">
+        <label class="form-label">房间名称</label>
+        <input type="text" class="form-input" id="edit-name" placeholder="房间名称" maxlength="20" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">状态</label>
+          <select class="form-select" id="edit-status">
+            <option value="waiting">等待中</option>
+            <option value="playing">进行中</option>
+            <option value="closed">已关闭</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">筹码门槛</label>
+          <input type="number" class="form-input" id="edit-chips" placeholder="1000" min="100" max="1000000" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">最小开局人数</label>
+          <select class="form-select" id="edit-min-players">
+            <option value="4">4人</option>
+            <option value="3">3人</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">当局数</label>
+          <select class="form-select" id="edit-rounds">
+            <option value="16">16局</option>
+            <option value="8">8局</option>
+            <option value="4">4局</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <input type="text" class="form-input" id="edit-note" placeholder="可选备注" maxlength="50" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="btn-cancel-edit">取消</button>
+        <button class="btn btn-gold" id="btn-save-edit">保存修改</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { requireAuth, apiGet, apiPatch, apiPost, clearAuth } from "./js/admin-auth.js";
+
+    if (!requireAuth()) { /* redirect */ }
+    else {
+      let ROOMS = [];
+      let currentFilter = 'all';
+      let searchQuery = '';
+      let editingRoomId = null;
+
+      document.getElementById('btn-logout').addEventListener('click', () => { clearAuth(); window.location.href = "admin-login.html"; });
+
+      async function loadRooms() {
+        try {
+          const res = await apiGet("/api/admin/rooms");
+          if (res.ok) { const data = await res.json(); ROOMS = data.rooms || []; renderRooms(); }
+        } catch(e) { toast("加载失败"); }
+      }
+
+      function statusBadge(s) {
+        const map = { waiting:{cls:'badge-gold',  txt:'等待中'}, playing:{cls:'badge-green',txt:'进行中'}, ended:{cls:'badge-grey', txt:'已结束'} };
+        const b = map[s] || map.ended;
+        return `<span class="badge ${b.cls}">${b.txt}</span>`;
+      }
+
+      function renderRooms() {
+        const tbody = document.getElementById('rooms-table');
+        tbody.innerHTML = '';
+        const q = searchQuery.toLowerCase();
+        const filtered = ROOMS.filter(r => {
+          const matchFilter = currentFilter === 'all' || r.status === currentFilter;
+          const matchSearch = !q || (r.name||'').toLowerCase().includes(q) || (r.id||'').toLowerCase().includes(q);
+          return matchFilter && matchSearch;
+        });
+        if (filtered.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--ink-faint);padding:32px;">暂无房间记录</td></tr>';
+          return;
+        }
+        filtered.forEach(r => {
+          const humans = (r.human_players||[]).filter(p => !p.startsWith('ai_player_'));
+          const playerAvatars = humans.length
+            ? humans.map((p,i) => `<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,rgba(212,175,55,0.3),rgba(212,175,55,0.1));border:1px solid rgba(212,175,55,0.3);font-size:0.60rem;font-weight:700;color:var(--gold);margin-left:${i>0?'-6px':0};position:relative;">${p[0]}</span>`).join('')
+            : '<span style="color:var(--ink-faint);font-size:0.75rem;">—</span>';
+          const chips = Object.values(r.cumulative_scores||{})[0] || 0;
+          const created = r.created_at ? new Date(r.created_at).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><span style="font-family:'Noto Serif SC',serif;font-weight:700;">${r.name||'—'}</span></td>
+            <td><code style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ink-muted);">${r.id.slice(0,8)}…</code></td>
+            <td>${statusBadge(r.status)}</td>
+            <td><span style="display:flex;align-items:center;gap:6px;">${playerAvatars}<span style="font-size:0.78rem;color:var(--ink-muted);">${humans.length}/${r.max_players||4}</span></span></td>
+            <td><span style="font-variant-numeric:tabular-nums;color:var(--gold);font-weight:700;">${chips.toLocaleString()}</span></td>
+            <td style="color:var(--ink-muted);font-size:0.78rem;">${created}</td>
+            <td>
+              <div class="action-btns">
+                <button class="btn btn-outline btn-sm" onclick="openEditModal('${r.id}')">编辑</button>
+                ${r.status === 'waiting' ? `
+                  <button class="btn btn-sm" style="background:rgba(60,160,90,0.80);border-color:rgba(80,200,100,0.45);color:#c8ffcc;" onclick="doStartRoom('${r.id}')">开局</button>
+                  <button class="btn btn-danger btn-sm" onclick="doCloseRoom('${r.id}')">关闭</button>
+                ` : r.status === 'playing' ? `
+                  <button class="btn btn-danger btn-sm" onclick="doForceEnd('${r.id}')">强制结束</button>
+                ` : `
+                  <button class="btn btn-outline btn-sm" onclick="doReopenRoom('${r.id}')" style="border-color:rgba(60,160,90,0.45);color:#6fcf6f;">重开</button>
+                `}
+              </div>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      window.openEditModal = function(id) {
+        editingRoomId = id;
+        const r = ROOMS.find(r => r.id === id);
+        if (!r) return;
+        document.getElementById('modal-title-text').textContent = '编辑房间：' + r.name;
+        document.getElementById('edit-room-id').value = id;
+        document.getElementById('edit-name').value = r.name || '';
+        document.getElementById('edit-status').value = r.status;
+        document.getElementById('edit-chips').value = Object.values(r.cumulative_scores||{})[0] || 1000;
+        document.getElementById('edit-modal').classList.remove('hidden');
+      };
+
+      function closeEditModal() {
+        document.getElementById('edit-modal').classList.add('hidden');
+        editingRoomId = null;
+      }
+
+      async function saveEdit() {
+        if (!editingRoomId) return;
+        const name = document.getElementById('edit-name').value.trim();
+        if (!name) { toast('房间名称不能为空'); return; }
+        const status = document.getElementById('edit-status').value;
+        const chips = parseInt(document.getElementById('edit-chips').value);
+        try {
+          const res = await apiPatch(`/api/admin/rooms/${editingRoomId}`, { name, status, chips });
+          if (res.ok) { toast('房间已更新'); closeEditModal(); loadRooms(); }
+          else { const d = await res.json(); toast(d.detail || '更新失败'); }
+        } catch(e) { toast('网络错误'); }
+      }
+
+      window.doCloseRoom = async function(id) {
+        try {
+          const res = await apiPost(`/api/admin/rooms/${id}/close`, {});
+          if (res.ok) { toast('房间已关闭'); loadRooms(); }
+          else { const d = await res.json(); toast(d.detail || '关闭失败'); }
+        } catch(e) { toast('网络错误'); }
+      }
+
+      window.doStartRoom = async function(id) {
+        try {
+          const res = await apiPost(`/api/admin/rooms/${id}/start`, {});
+          if (res.ok) { toast('房间已开局'); loadRooms(); }
+          else { const d = await res.json(); toast(d.detail || '开局失败'); }
+        } catch(e) { toast('网络错误'); }
+      }
+
+      window.doForceEnd = async function(id) {
+        try {
+          const res = await apiPost(`/api/admin/rooms/${id}/force_end`, {});
+          if (res.ok) { toast('游戏已强制结束，房间已重置'); loadRooms(); }
+          else { const d = await res.json(); toast(d.detail || '强制结束失败'); }
+        } catch(e) { toast('网络错误'); }
+      }
+
+      window.doReopenRoom = async function(id) {
+        try {
+          const res = await apiPost(`/api/admin/rooms/${id}/reopen`, {});
+          if (res.ok) { toast('房间已重开'); loadRooms(); }
+          else { const d = await res.json(); toast(d.detail || '重开失败'); }
+        } catch(e) { toast('网络错误'); }
+      }
+
+      function toast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg; t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2200);
+      }
+
+      document.getElementById('search-input').addEventListener('input', e => { searchQuery = e.target.value; renderRooms(); });
+      document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          currentFilter = tab.dataset.filter;
+          renderRooms();
+        });
+      });
+      document.getElementById('modal-close-btn').addEventListener('click', closeEditModal);
+      document.getElementById('btn-cancel-edit').addEventListener('click', closeEditModal);
+      document.getElementById('btn-save-edit').addEventListener('click', saveEdit);
+      document.getElementById('edit-modal').addEventListener('click', e => { if (e.target.id === 'edit-modal') closeEditModal(); });
+      document.getElementById('btn-create-room').addEventListener('click', () => toast('新建房间请在游戏大厅操作'));
+
+      loadRooms();
+    }
+  </script>
+</body>
+</html>

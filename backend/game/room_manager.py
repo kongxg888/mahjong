@@ -246,3 +246,14 @@ class RoomManager:
             "Game started: room=%s players=%s round=%d", room_id, player_ids, room.round_number
         )
         return game_state
+
+    def broadcast_rooms(self) -> None:
+        """
+        Broadcast the current room list to all connected WebSocket clients.
+        Safe to call from REST routes — uses a lazy import to avoid circular deps.
+        """
+        try:
+            from api.websocket import _broadcast_room_update
+            _broadcast_room_update()
+        except Exception:
+            pass

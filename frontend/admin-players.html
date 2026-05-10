@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>玩家记录 — 雀巢 Mahjong 管理后台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base:        #18261E;
+      --bg-base-alt:    #1a2e22;
+      --gold:           #D4AF37;
+      --gold-light:     #E8C962;
+      --gold-dim:       rgba(212,175,55,0.12);
+      --gold-border:    rgba(212,175,55,0.28);
+      --gold-glow:     rgba(212,175,55,0.22);
+      --ink:            #F5F5DC;
+      --ink-muted:      rgba(245,245,220,0.68);
+      --ink-faint:      rgba(255,255,255,0.40);
+      --glass-bg-card:  rgba(0,0,0,0.35);
+      --glass-border:   rgba(212,175,55,0.28);
+      --glass-blur:     blur(10px) saturate(140%);
+      --panel-border:   rgba(212,175,55,0.15);
+      --radius-sm:   6px;
+      --radius-md:  12px;
+      --radius-lg:  18px;
+      --radius-xl:  24px;
+      --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+      --duration-fast:   120ms;
+      --duration-normal: 220ms;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: 'Inter', 'Noto Sans SC', -apple-system, sans-serif;
+      background-color: var(--bg-base);
+      background-image: radial-gradient(rgba(212,175,55,0.06) 1px, transparent 1px);
+      background-size: 26px 26px;
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      -webkit-font-smoothing: antialiased;
+    }
+    .sidebar { width:240px;flex-shrink:0;background:rgba(0,0,0,0.55);border-right:1px solid var(--panel-border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto; }
+    .sidebar-brand { display:flex;align-items:center;gap:12px;padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.06); }
+    .sidebar-brand-icon { width:40px;height:40px;background:linear-gradient(135deg,rgba(212,175,55,0.20),rgba(212,175,55,0.08));border:1px solid rgba(212,175,55,0.30);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0; }
+    .sidebar-brand-text { display:flex;flex-direction:column; }
+    .sidebar-brand-name { font-family:'Noto Serif SC',serif;font-size:1rem;font-weight:900;color:var(--gold);letter-spacing:0.08em;line-height:1; }
+    .sidebar-brand-sub { font-size:0.65rem;color:var(--ink-muted);letter-spacing:0.1em;text-transform:uppercase;margin-top:3px; }
+    .sidebar-nav { padding:16px 12px;flex:1;display:flex;flex-direction:column;gap:4px; }
+    .nav-section-label { font-size:0.62rem;font-weight:700;color:var(--ink-faint);letter-spacing:0.12em;text-transform:uppercase;padding:8px 8px 4px; }
+    .nav-item { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-md);color:var(--ink-muted);text-decoration:none;font-size:0.85rem;font-weight:500;transition:background var(--duration-fast),color var(--duration-fast);cursor:pointer;border:none;background:none;width:100%;text-align:left; }
+    .nav-item:hover { background:rgba(255,255,255,0.06);color:var(--ink); }
+    .nav-item.active { background:var(--gold-dim);color:var(--gold);border:1px solid rgba(212,175,55,0.20); }
+    .nav-item svg { flex-shrink:0;opacity:0.7; }
+    .nav-item.active svg { opacity:1; }
+    .sidebar-footer { padding:16px 12px;border-top:1px solid rgba(255,255,255,0.06); }
+    .admin-user { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-md);background:rgba(255,255,255,0.04); }
+    .admin-avatar { width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold-light));display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:900;color:var(--bg-base);flex-shrink:0; }
+    .admin-info { flex:1;overflow:hidden; }
+    .admin-name { font-size:0.80rem;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .admin-role { font-size:0.65rem;color:var(--ink-muted); }
+    .main { flex:1;min-width:0;display:flex;flex-direction:column; }
+    .topbar { display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:rgba(0,0,0,0.40);border-bottom:1px solid var(--panel-border);position:sticky;top:0;z-index:10; }
+    .topbar-title { font-family:'Noto Serif SC',serif;font-size:1.1rem;font-weight:700;color:var(--gold);letter-spacing:0.06em; }
+    .topbar-actions { display:flex;align-items:center;gap:10px; }
+    .btn { display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0.5rem 1rem;border-radius:var(--radius-md);font-size:0.82rem;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid transparent;transition:all var(--duration-fast) var(--ease-out);white-space:nowrap; }
+    .btn:active:not(:disabled) { transform:scale(0.95); }
+    .btn:disabled { opacity:0.4;cursor:not-allowed; }
+    .btn-gold { background:linear-gradient(135deg,rgba(212,175,55,0.85),rgba(212,175,55,0.70));border-color:var(--gold);color:var(--bg-base);box-shadow:0 3px 12px rgba(212,175,55,0.25); }
+    .btn-gold:hover { background:linear-gradient(135deg,var(--gold),var(--gold-light));box-shadow:0 5px 18px rgba(212,175,55,0.40);transform:translateY(-1px); }
+    .btn-outline { background:transparent;border-color:var(--gold-border);color:var(--gold); }
+    .btn-outline:hover { background:var(--gold-dim); }
+    .btn-ghost { background:transparent;border-color:rgba(255,255,255,0.15);color:var(--ink-muted); }
+    .btn-ghost:hover { background:rgba(255,255,255,0.06);color:var(--ink); }
+    .btn-danger { background:rgba(160,40,40,0.80);border-color:rgba(200,80,80,0.45);color:#ffcccc; }
+    .btn-danger:hover { background:rgba(180,50,50,0.90); }
+    .btn-success { background:rgba(40,120,60,0.80);border-color:rgba(60,160,80,0.45);color:#ccffcc; }
+    .btn-success:hover { background:rgba(50,150,70,0.90); }
+    .btn-sm { padding:0.3rem 0.7rem;font-size:0.75rem; }
+    .content { padding:24px 28px;display:flex;flex-direction:column;gap:20px;flex:1; }
+    .stats-row { display:grid;grid-template-columns:repeat(3,1fr);gap:16px; }
+    .stat-card { background:var(--glass-bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:18px 20px;box-shadow:0 4px 16px rgba(0,0,0,0.3);display:flex;flex-direction:column;gap:6px; }
+    .stat-card__label { font-size:0.72rem;color:var(--ink-muted);font-weight:600;letter-spacing:0.06em;text-transform:uppercase; }
+    .stat-card__value { font-family:'Noto Serif SC',serif;font-size:1.8rem;font-weight:900;color:var(--gold);line-height:1; }
+    .stat-card__sub { font-size:0.72rem;color:var(--ink-muted); }
+    .stat-card__sub span { color:#6fcf6f;font-weight:700; }
+    .toolbar { display:flex;align-items:center;gap:10px;flex-wrap:wrap; }
+    .toolbar-search { display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.30);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-md);padding:0 12px;flex:1;max-width:280px; }
+    .toolbar-search input { background:none;border:none;outline:none;color:var(--ink);font-family:inherit;font-size:0.85rem;padding:8px 0;width:100%; }
+    .toolbar-search input::placeholder { color:var(--ink-faint); }
+    .toolbar-search:focus-within { border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow); }
+    .filter-tabs { display:flex;gap:4px; }
+    .filter-tab { padding:6px 14px;border-radius:var(--radius-full);font-size:0.78rem;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,0.10);background:none;color:var(--ink-muted);transition:all var(--duration-fast); }
+    .filter-tab:hover { background:rgba(255,255,255,0.06); }
+    .filter-tab.active { background:var(--gold-dim);border-color:rgba(212,175,55,0.35);color:var(--gold); }
+    .card { background:var(--glass-bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--radius-lg);box-shadow:0 4px 16px rgba(0,0,0,0.3);overflow:hidden; }
+    .card-body { padding:0; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%;border-collapse:collapse;font-size:0.82rem; }
+    thead th { padding:10px 16px;text-align:left;color:var(--ink-muted);font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.08);white-space:nowrap;background:rgba(0,0,0,0.20); }
+    tbody tr { border-bottom:1px solid rgba(255,255,255,0.05);transition:background var(--duration-fast); }
+    tbody tr:hover { background:rgba(255,255,255,0.04); }
+    tbody td { padding:10px 16px;color:var(--ink);vertical-align:middle; }
+    .badge { display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:var(--radius-full);font-size:0.70rem;font-weight:700;letter-spacing:0.02em;white-space:nowrap; }
+    .badge-green  { background:rgba(60,160,90,0.18);color:#6fcf6f;border:1px solid rgba(60,160,90,0.30); }
+    .badge-gold   { background:rgba(212,175,55,0.15);color:var(--gold);border:1px solid rgba(212,175,55,0.25); }
+    .badge-red    { background:rgba(200,60,60,0.18);color:#eb7474;border:1px solid rgba(200,60,60,0.30); }
+    .badge-grey   { background:rgba(255,255,255,0.08);color:var(--ink-muted);border:1px solid rgba(255,255,255,0.12); }
+    .action-btns { display:flex;gap:5px; }
+    .player-cell { display:flex;align-items:center;gap:10px; }
+    .player-avatar { width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,rgba(212,175,55,0.25),rgba(212,175,55,0.08));border:1.5px solid rgba(212,175,55,0.30);display:flex;align-items:center;justify-content:center;font-size:0.80rem;font-weight:900;color:var(--gold);flex-shrink:0; }
+    .player-name-block { display:flex;flex-direction:column;gap:1px; }
+    .player-name { font-weight:700;font-size:0.85rem;color:var(--ink); }
+    .player-id { font-size:0.68rem;color:var(--ink-muted);font-family:'JetBrains Mono',monospace; }
+    /* Modal */
+    .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.60);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:200;pointer-events:none;opacity:0;transition:opacity var(--duration-normal); }
+    .modal-overlay:not(.hidden) { opacity:1;pointer-events:auto; }
+    .modal-box { background:var(--bg-base-alt);border:1.5px solid var(--gold);border-radius:var(--radius-xl);padding:28px 24px;max-width:500px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 16px 64px rgba(0,0,0,0.75),0 0 40px rgba(212,175,55,0.12);transform:scale(0.95);transition:transform var(--duration-normal) var(--ease-out); }
+    .modal-overlay:not(.hidden) .modal-box { transform:scale(1); }
+    .modal-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:20px; }
+    .modal-title { font-family:'Noto Serif SC',serif;font-size:1.1rem;font-weight:700;color:var(--gold); }
+    .modal-close { background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:1.2rem;padding:4px;border-radius:var(--radius-sm);transition:color var(--duration-fast); }
+    .modal-close:hover { color:var(--ink); }
+    .form-group { margin-bottom:14px; }
+    .form-label { display:block;font-size:0.72rem;font-weight:700;color:var(--ink-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px; }
+    .form-input, .form-select, .form-textarea { width:100%;padding:8px 12px;background:rgba(0,0,0,0.30);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-md);color:var(--ink);font-family:inherit;font-size:0.85rem;outline:none;transition:border-color var(--duration-fast),box-shadow var(--duration-fast); }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow); }
+    .form-input::placeholder, .form-textarea::placeholder { color:var(--ink-faint); }
+    .form-textarea { resize:vertical;min-height:80px; }
+    .form-select option { background:#1a2e22;color:var(--ink); }
+    .form-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+    .chip-adjust { display:flex;align-items:center;gap:8px; }
+    .chip-adjust .form-input { text-align:center;font-variant-numeric:tabular-nums;font-weight:700;font-size:1rem; }
+    .chip-btn { width:36px;height:36px;border-radius:var(--radius-md);border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:var(--ink-muted);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--duration-fast);flex-shrink:0; }
+    .chip-btn:hover { background:rgba(255,255,255,0.10);color:var(--ink); }
+    .chip-btn.plus { border-color:rgba(60,160,90,0.40);color:#6fcf6f; }
+    .chip-btn.plus:hover { background:rgba(60,160,90,0.20); }
+    .chip-btn.minus { border-color:rgba(200,60,60,0.40);color:#eb7474; }
+    .chip-btn.minus:hover { background:rgba(200,60,60,0.20); }
+    .modal-footer { display:flex;gap:10px;justify-content:flex-end;margin-top:20px; }
+    .toast { position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);color:var(--ink);padding:10px 22px;border-radius:9999px;font-size:0.82rem;z-index:999;pointer-events:none;white-space:nowrap;border:1px solid rgba(212,175,55,0.25);box-shadow:0 4px 16px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s,transform 0.2s; }
+    .toast.show { opacity:1;transform:translateX(-50%) translateY(0); }
+    @media (max-width:768px) { .sidebar{display:none;} .content{padding:16px;} .topbar{padding:12px 16px;} .stats-row{grid-template-columns:1fr 1fr;} }
+    ::-webkit-scrollbar{width:5px;height:5px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:3px; }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">🀄</div>
+      <div class="sidebar-brand-text">
+        <span class="sidebar-brand-name">雀巢</span>
+        <span class="sidebar-brand-sub">Mahjong Admin</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">概览</div>
+      <a class="nav-item" href="admin-dashboard.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        仪表盘
+      </a>
+      <div class="nav-section-label">运营管理</div>
+      <a class="nav-item" href="admin-rooms.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        房间列表
+      </a>
+      <a class="nav-item active" href="admin-players.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        玩家记录
+      </a>
+      <a class="nav-item" href="admin-games.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        对局记录
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-user">
+        <div class="admin-avatar">管</div>
+        <div class="admin-info">
+          <div class="admin-name">管理员</div>
+          <div class="admin-role">超级管理员</div>
+        </div>
+      </div>
+      <button class="btn btn-secondary" id="btn-logout" style="margin-top:8px;font-size:0.75rem;padding:6px 12px;width:100%;justify-content:center;">退出登录</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <h1 class="topbar-title">玩家记录</h1>
+      <div class="topbar-actions">
+        <button class="btn btn-gold" id="btn-add-player">+ 新增玩家</button>
+        <span style="font-size:0.78rem;color:var(--ink-muted);">共 <span style="color:var(--gold);font-weight:700;font-variant-numeric:tabular-nums;" id="total-players-count">—</span> 名玩家</span>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-card__label">总玩家数</div>
+          <div class="stat-card__value" id="stat-total">—</div>
+          <div class="stat-card__sub">注册至今</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__label">当前在线</div>
+          <div class="stat-card__value" style="color:#6fcf6f;" id="stat-online">—</div>
+          <div class="stat-card__sub">实时</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__label">被封禁</div>
+          <div class="stat-card__value" style="color:#eb7474;" id="stat-banned">—</div>
+          <div class="stat-card__sub"><span id="stat-frozen">—</span> 冻结中</div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="toolbar-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-input" placeholder="搜索玩家名或ID…" />
+        </div>
+        <div class="filter-tabs">
+          <button class="filter-tab active" data-filter="all">全部</button>
+          <button class="filter-tab" data-filter="online">在线</button>
+          <button class="filter-tab" data-filter="frozen">冻结</button>
+          <button class="filter-tab" data-filter="banned">封禁</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>玩家</th>
+                  <th>状态</th>
+                  <th>筹码</th>
+                  <th>总局数</th>
+                  <th>胜率</th>
+                  <th>最后上线</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="players-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div class="modal-overlay hidden" id="confirm-delete-modal">
+    <div class="modal-box" style="max-width:400px;">
+      <div class="modal-header">
+        <span class="modal-title">确认删除</span>
+        <button class="modal-close" id="confirm-delete-close-btn">✕</button>
+      </div>
+      <p style="color:var(--ink-muted);font-size:0.88rem;line-height:1.6;margin-bottom:20px;">
+        确定要删除玩家 <strong id="delete-player-name" style="color:var(--ink);"></strong> 吗？<br/>
+        此操作不可撤销，对局记录将保留，但玩家账号将被永久删除。
+      </p>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="btn-cancel-delete">取消</button>
+        <button class="btn btn-danger" id="btn-confirm-delete">确认删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Player Modal -->
+  <div class="modal-overlay hidden" id="edit-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title-text">编辑玩家</span>
+        <button class="modal-close" id="modal-close-btn">✕</button>
+      </div>
+      <input type="hidden" id="edit-player-id" />
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">玩家昵称</label>
+          <input type="text" class="form-input" id="edit-name" placeholder="昵称" maxlength="20" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">状态</label>
+          <select class="form-select" id="edit-status">
+            <option value="active">正常</option>
+            <option value="frozen">冻结</option>
+            <option value="banned">封禁</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">筹码调整</label>
+        <div class="chip-adjust">
+          <button type="button" class="chip-btn minus" id="btn-chip-minus">−</button>
+          <input type="number" class="form-input" id="edit-chips" value="0" style="text-align:center;font-weight:700;" />
+          <button type="button" class="chip-btn plus" id="btn-chip-plus">+</button>
+        </div>
+        <div style="font-size:0.70rem;color:var(--ink-faint);margin-top:4px;">输入数值调整筹码（正数增加，负数减少）</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <textarea class="form-textarea" id="edit-note" placeholder="管理员备注…" maxlength="100"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="btn-ban" style="margin-right:auto;">封禁账号</button>
+        <button class="btn btn-ghost" id="btn-cancel-edit">取消</button>
+        <button class="btn btn-gold" id="btn-save-edit">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Player Modal -->
+  <div class="modal-overlay hidden" id="add-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title">新增玩家</span>
+        <button class="modal-close" id="add-modal-close-btn">✕</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">手机号（登录账号）<span style="color:#eb7474;">*</span></label>
+        <input type="text" class="form-input" id="add-phone" placeholder="11位手机号" maxlength="11" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">玩家昵称</label>
+        <input type="text" class="form-input" id="add-name" placeholder="留空则显示手机号" maxlength="20" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">初始筹码</label>
+        <input type="number" class="form-input" id="add-chips" value="10000" min="0" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="btn-cancel-add">取消</button>
+        <button class="btn btn-gold" id="btn-confirm-add">确认创建</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { requireAuth, apiGet, apiPatch, apiPost, apiDelete, clearAuth } from "./js/admin-auth.js";
+
+    if (!requireAuth()) { /* 已重定向 */ }
+    else {
+      // ============================================================
+      // 状态
+      // ============================================================
+      let PLAYERS = [];
+      let currentFilter = 'all';
+      let searchQuery = '';
+      let editingPlayerId = null;
+      let deletingPlayerId = null;
+
+      // ============================================================
+      // 通用
+      // ============================================================
+      function $(id) { return document.getElementById(id); }
+
+      function toast(msg) {
+        const t = $('toast');
+        if (!t) return;
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2200);
+      }
+
+      // ============================================================
+      // 数据加载 & 渲染
+      // ============================================================
+      async function loadPlayers() {
+        try {
+          const res = await apiGet("/api/admin/players");
+          if (res.ok) {
+            const data = await res.json();
+            PLAYERS = data.players || [];
+            renderPlayers();
+          } else {
+            toast("加载失败：" + res.status);
+          }
+        } catch(e) { toast("加载失败"); }
+      }
+
+      function statusBadge(s) {
+        const map = {
+          active:  { cls: 'badge-green', txt: '正常' },
+          frozen:  { cls: 'badge-gold',  txt: '冻结' },
+          banned:  { cls: 'badge-red',   txt: '已封禁' },
+        };
+        const b = map[s] || { cls: 'badge-grey', txt: '未知' };
+        return `<span class="badge ${b.cls}">${b.txt}</span>`;
+      }
+
+      function renderPlayers() {
+        const tbody = $('players-table');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        const q = searchQuery.toLowerCase();
+        const filtered = PLAYERS.filter(p => {
+          const matchFilter = currentFilter === 'all' || p.status === currentFilter;
+          const matchSearch = !q ||
+            (p.id   || '').toLowerCase().includes(q) ||
+            (p.name || '').toLowerCase().includes(q);
+          return matchFilter && matchSearch;
+        });
+
+        $('total-players-count').textContent = PLAYERS.length;
+        $('stat-total').textContent          = PLAYERS.length;
+        $('stat-online').textContent          = PLAYERS.filter(p => p.status === 'active').length;
+        $('stat-banned').textContent          = PLAYERS.filter(p => p.status === 'banned').length;
+        $('stat-frozen').textContent          = PLAYERS.filter(p => p.status === 'frozen').length;
+
+        if (filtered.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--ink-faint);padding:32px;">暂无匹配记录</td></tr>';
+          return;
+        }
+
+        filtered.forEach(p => {
+          const name  = p.name || p.id;
+          const chips = p.chips || 0;
+          const tr    = document.createElement('tr');
+          tr.innerHTML = `
+            <td>
+              <div class="player-cell">
+                <div class="player-avatar">${(name[0]||'?').toUpperCase()}</div>
+                <div class="player-name-block">
+                  <span class="player-name">${name}</span>
+                  <span class="player-id">${p.note || '—'}</span>
+                </div>
+              </div>
+            </td>
+            <td>${statusBadge(p.status)}</td>
+            <td><span style="font-variant-numeric:tabular-nums;font-weight:700;color:var(--gold);">${chips.toLocaleString()}</span></td>
+            <td><span style="font-variant-numeric:tabular-nums;">${p.total_games || 0}</span></td>
+            <td><span style="font-variant-numeric:tabular-nums;color:#6fcf6f;font-weight:700;">${((p.total_wins||0)/(p.total_games||1)*100).toFixed(1)}%</span></td>
+            <td style="color:var(--ink-muted);font-size:0.78rem;">${p.last_seen ? new Date(p.last_seen).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+            <td>
+              <div class="action-btns">
+                <button class="btn btn-outline btn-sm" data-action="edit" data-id="${p.id}">编辑</button>
+                ${p.status === 'banned'
+                  ? `<button class="btn btn-success btn-sm" data-action="unban" data-id="${p.id}">解封</button>`
+                  : `<button class="btn btn-danger btn-sm"  data-action="ban"   data-id="${p.id}">封禁</button>`}
+                <button class="btn btn-ghost btn-sm" style="color:#eb7474;border-color:rgba(200,60,60,0.30);" data-action="delete" data-id="${p.id}">删除</button>
+              </div>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      // ============================================================
+      // 编辑玩家
+      // ============================================================
+      function openEditModal(id) {
+        const p = PLAYERS.find(p => p.id === id);
+        if (!p) return;
+        editingPlayerId = id;
+        $('modal-title-text').textContent    = '编辑玩家';
+        $('edit-player-id').value            = id;
+        $('edit-name').value                 = p.name || '';
+        $('edit-status').value               = p.status || 'active';
+        $('edit-chips').value                = 0;
+        $('edit-chips').dataset.originalChips = p.chips || 0;
+        $('edit-note').value                 = p.note || '';
+        const banBtn = $('btn-ban');
+        banBtn.textContent = p.status === 'banned' ? '解封账号' : '封禁账号';
+        banBtn.className   = p.status === 'banned' ? 'btn btn-success' : 'btn btn-danger';
+        $('edit-modal').classList.remove('hidden');
+      }
+
+      function closeEditModal() {
+        $('edit-modal').classList.add('hidden');
+        editingPlayerId = null;
+      }
+
+      async function saveEdit() {
+        if (!editingPlayerId) return;
+        const body     = {};
+        const status   = $('edit-status').value;
+        const chipsIn  = parseInt($('edit-chips').value) || 0;
+        const origChips= parseInt($('edit-chips').dataset.originalChips) || 0;
+        const delta    = chipsIn - origChips;
+        const name     = $('edit-name').value.trim();
+        const note     = $('edit-note').value.trim();
+        if (status)            body.status = status;
+        if (delta !== 0)       body.chips   = delta;
+        if (name)              body.name    = name;
+        if (note)              body.note    = note;
+        if (Object.keys(body).length === 0) { toast('没有修改'); return; }
+        try {
+          const res = await apiPatch(`/api/admin/players/${editingPlayerId}`, body);
+          const d   = await res.json();
+          if (res.ok) { toast('玩家信息已保存'); closeEditModal(); loadPlayers(); }
+          else        { toast(d.detail || '保存失败'); }
+        } catch(e) { toast('网络错误'); }
+      }
+
+      // ============================================================
+      // 封禁 / 解封
+      // ============================================================
+      async function doBan(id) {
+        try {
+          const res = await apiPatch(`/api/admin/players/${id}`, { status: 'banned' });
+          const d   = await res.json();
+          if (res.ok) { toast('玩家已封禁'); loadPlayers(); }
+          else        { toast(d.detail || '封禁失败'); }
+        } catch(e) { toast('网络错误'); }
+      }
+
+      async function doUnban(id) {
+        try {
+          const res = await apiPatch(`/api/admin/players/${id}`, { status: 'active' });
+          const d   = await res.json();
+          if (res.ok) { toast('玩家已解封'); loadPlayers(); }
+          else        { toast(d.detail || '解封失败'); }
+        } catch(e) { toast('网络错误'); }
+      }
+
+      // ============================================================
+      // 删除玩家
+      // ============================================================
+      function openDeleteConfirm(id) {
+        const p = PLAYERS.find(p => p.id === id);
+        if (!p) return;
+        deletingPlayerId = id;
+        $('delete-player-name').textContent = p.name || p.id;
+        $('confirm-delete-modal').classList.remove('hidden');
+      }
+
+      function closeDeleteConfirm() {
+        $('confirm-delete-modal').classList.add('hidden');
+        deletingPlayerId = null;
+      }
+
+      async function doDeletePlayer() {
+        if (!deletingPlayerId) return;
+        const id = deletingPlayerId;
+        try {
+          const res = await apiDelete(`/api/admin/players/${id}`);
+          const d   = await res.json();
+          if (res.ok) { toast('玩家已删除'); closeDeleteConfirm(); loadPlayers(); }
+          else        { toast(d.detail || '删除失败'); }
+        } catch(e) { toast('网络错误'); }
+      }
+
+      // ============================================================
+      // 新增玩家
+      // ============================================================
+      function openAddModal() {
+        $('add-phone').value = '';
+        $('add-name').value  = '';
+        $('add-chips').value = '10000';
+        $('add-modal').classList.remove('hidden');
+      }
+
+      function closeAddModal() {
+        $('add-modal').classList.add('hidden');
+      }
+
+      async function doAddPlayer() {
+        const phone = $('add-phone').value.trim();
+        const name  = $('add-name').value.trim();
+        const chips = parseInt($('add-chips').value) || 10000;
+        if (!phone)              { toast('请输入手机号'); return; }
+        if (phone.length !== 11) { toast('手机号格式不正确'); return; }
+        try {
+          const res  = await apiPost('/api/admin/players', { phone, name, chips });
+          const d    = await res.json();
+          if (res.ok) {
+            toast('玩家创建成功');
+            closeAddModal();
+            loadPlayers();
+          } else {
+            toast(d.detail || '创建失败');
+          }
+        } catch(e) { toast('网络错误'); }
+      }
+
+      // ============================================================
+      // 事件绑定
+      // ============================================================
+      $('btn-logout').addEventListener('click', () => { clearAuth(); window.location.href = 'admin-login.html'; });
+
+      // 搜索 & 筛选
+      $('search-input').addEventListener('input', e => { searchQuery = e.target.value; renderPlayers(); });
+      document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          currentFilter = tab.dataset.filter;
+          renderPlayers();
+        });
+      });
+
+      // 表格操作按钮（委托到 tbody）
+      $('players-table').addEventListener('click', e => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const id     = btn.dataset.id;
+        if      (action === 'edit')   openEditModal(id);
+        else if (action === 'ban')    doBan(id);
+        else if (action === 'unban')  doUnban(id);
+        else if (action === 'delete') openDeleteConfirm(id);
+      });
+
+      // 编辑弹窗
+      $('modal-close-btn').addEventListener('click', closeEditModal);
+      $('btn-cancel-edit').addEventListener('click', closeEditModal);
+      $('btn-save-edit').addEventListener('click', saveEdit);
+      $('btn-ban').addEventListener('click', () => {
+        if (!editingPlayerId) return;
+        const p = PLAYERS.find(p => p.id === editingPlayerId);
+        if (!p) return;
+        if (p.status === 'banned') doUnban(editingPlayerId);
+        else                        doBan(editingPlayerId);
+        closeEditModal();
+      });
+      $('btn-chip-minus').addEventListener('click', () => {
+        const input = $('edit-chips');
+        input.value = (parseInt(input.value) || 0) - 1000;
+      });
+      $('btn-chip-plus').addEventListener('click', () => {
+        const input = $('edit-chips');
+        input.value = (parseInt(input.value) || 0) + 1000;
+      });
+      $('edit-modal').addEventListener('click', e => { if (e.target.id === 'edit-modal') closeEditModal(); });
+
+      // 新增玩家弹窗
+      $('btn-add-player').addEventListener('click', openAddModal);
+      $('add-modal-close-btn').addEventListener('click', closeAddModal);
+      $('btn-cancel-add').addEventListener('click', closeAddModal);
+      $('btn-confirm-add').addEventListener('click', doAddPlayer);
+      $('add-modal').addEventListener('click', e => { if (e.target.id === 'add-modal') closeAddModal(); });
+
+      // 删除确认弹窗
+      $('confirm-delete-close-btn').addEventListener('click', closeDeleteConfirm);
+      $('btn-cancel-delete').addEventListener('click', closeDeleteConfirm);
+      $('btn-confirm-delete').addEventListener('click', doDeletePlayer);
+      $('confirm-delete-modal').addEventListener('click', e => { if (e.target.id === 'confirm-delete-modal') closeDeleteConfirm(); });
+
+      // 初始加载
+      loadPlayers();
+
+      // 暴露到 window（方便 Playwright / 控制台调试）
+      window.loadPlayers   = loadPlayers;
+      window.doDeletePlayer = doDeletePlayer;
+      window.openDeleteConfirm = openDeleteConfirm;
+      window.doBan        = doBan;
+      window.doUnban      = doUnban;
+      window.doAddPlayer  = doAddPlayer;
+      window.saveEdit     = saveEdit;
+    }
+  </script>
+</body>
+</html>

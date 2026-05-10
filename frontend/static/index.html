@@ -691,11 +691,11 @@
         <span class="stat-card__label">在线</span>
       </div>
       <div class="stat-card">
-        <span class="stat-card__value" id="stat-rooms">—</span>
+        <span class="stat-card__value">4</span>
         <span class="stat-card__label">房间</span>
       </div>
       <div class="stat-card">
-        <span class="stat-card__value" id="stat-games">—</span>
+        <span class="stat-card__value">12</span>
         <span class="stat-card__label">对局</span>
       </div>
     </div>
@@ -703,13 +703,69 @@
     <!-- Room list -->
     <div class="section-header">
       <h2 class="section-title">游戏房间</h2>
-      <span class="badge badge--muted" id="rooms-updated-label">—</span>
+      <span class="badge badge--muted">实时</span>
     </div>
 
     <div id="rooms-list">
-      <!-- Skeleton loading -->
-      <div class="room-card skeleton" id="rooms-skeleton-1" style="height:100px;margin-bottom:12px"></div>
-      <div class="room-card skeleton" id="rooms-skeleton-2" style="height:100px;margin-bottom:12px"></div>
+
+      <!-- Room 1: waiting -->
+      <div class="room-card" role="button" tabindex="0" aria-label="加入等待中的房间『翡翠阁』">
+        <div class="room-card__header">
+          <span class="room-card__name">翡翠阁</span>
+          <span class="room-card__badge room-card__badge--waiting">🟢 等待中</span>
+        </div>
+        <div class="room-card__body">
+          <div class="room-card__players">
+            <!-- Player avatars: 2 human, 2 empty -->
+            <div class="room-avatar" title="玩家：龙啸">龙</div>
+            <div class="room-avatar" title="玩家：凤鸣">凤</div>
+            <div class="room-avatar room-avatar--empty" title="空位">?</div>
+            <div class="room-avatar room-avatar--empty" title="空位">?</div>
+          </div>
+          <div class="room-card__info">
+            <span class="room-card__chips">筹码 <strong>1,000</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Room 2: playing -->
+      <div class="room-card" role="button" tabindex="0" aria-label="加入游戏中房间『金殿』">
+        <div class="room-card__header">
+          <span class="room-card__name">金殿</span>
+          <span class="room-card__badge room-card__badge--playing">⚡ 对战中</span>
+        </div>
+        <div class="room-card__body">
+          <div class="room-card__players">
+            <div class="room-avatar" title="玩家：云淡">云</div>
+            <div class="room-avatar room-avatar--ai" title="AI 托管">AI</div>
+            <div class="room-avatar" title="玩家：风清">风</div>
+            <div class="room-avatar" title="玩家：月朗">月</div>
+          </div>
+          <div class="room-card__info">
+            <span class="room-card__chips">筹码 <strong>2,340</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Room 3: waiting -->
+      <div class="room-card" role="button" tabindex="0" aria-label="加入等待中的房间『清风雅居』">
+        <div class="room-card__header">
+          <span class="room-card__name">清风雅居</span>
+          <span class="room-card__badge room-card__badge--waiting">🟢 等待中</span>
+        </div>
+        <div class="room-card__body">
+          <div class="room-card__players">
+            <div class="room-avatar" title="玩家：雨濂">雨</div>
+            <div class="room-avatar room-avatar--empty" title="空位">?</div>
+            <div class="room-avatar room-avatar--empty" title="空位">?</div>
+            <div class="room-avatar room-avatar--empty" title="空位">?</div>
+          </div>
+          <div class="room-card__info">
+            <span class="room-card__chips">筹码 <strong>500</strong></span>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- Empty state (hidden by default, shown when no rooms) -->
@@ -825,187 +881,30 @@
   </div>
 
   <script>
-    /* ── API helpers ───────────────────────────────────────── */
-    const API = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
-      ? `http://${location.host}`
-      : '';
+    /* ── Mock data — replace with real API calls ───────────── */
+    const MOCK_PLAYER_ID = 'p_' + Math.random().toString(36).slice(2, 9);
+    document.getElementById('player-id-display').textContent = MOCK_PLAYER_ID;
 
-    async function apiFetch(url, opts = {}) {
-      const res = await fetch(API + url, {
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
-        ...opts,
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`${res.status} ${body}`);
-      }
-      return res.json();
-    }
-
-    /* ── Player session ─────────────────────────────────────── */
-    const SESSION_KEY = 'mahjong_player';
-    let myPlayerId = localStorage.getItem(SESSION_KEY) || null;
-    let myPlayerName = localStorage.getItem('mahjong_player_name') || '';
-
-    // If no player session, redirect to login
-    if (!myPlayerId) {
-      location.replace('login.html?next=index.html');
-    }
-
-    document.getElementById('player-id-display').textContent =
-      myPlayerName ? `${myPlayerName} · ${myPlayerId}` : myPlayerId;
-
-    /* ── Room card builder ─────────────────────────────────── */
-    const PLAYER_NAME_MAP = {}; // id → display name
-
-    function getPlayerInitial(player) {
-      if (!player) return '?';
-      if (player.id.startsWith('ai_')) return 'AI';
-      const name = PLAYER_NAME_MAP[player.id] || player.name || player.id;
-      return name.slice(0, 1);
-    }
-
-    function getPlayerTitle(player) {
-      if (!player) return '空位';
-      if (player.id.startsWith('ai_')) return 'AI 托管';
-      const name = PLAYER_NAME_MAP[player.id] || player.name || player.id;
-      return `玩家：${name}`;
-    }
-
-    function renderRoomCard(room) {
-      const isWaiting = room.status === 'waiting' || room.status === 'open';
-      const isPlaying = room.status === 'playing';
-      const badge = isWaiting
-        ? '🟢 等待中'
-        : isPlaying
-        ? '⚡ 对战中'
-        : room.status;
-      const badgeClass = isWaiting
-        ? 'room-card__badge--waiting'
-        : isPlaying
-        ? 'room-card__badge--playing'
-        : '';
-
-      const chips = room.chips != null ? room.chips.toLocaleString() : '—';
-      const roomName = escapeHtml(room.name || room.id);
-
-      // Players
-      const players = room.players || [];
-      const playerSlots = Array.from({ length: 4 }, (_, i) => {
-        const p = players[i];
-        if (p) {
-          const initial = getPlayerInitial(p);
-          const title = getPlayerTitle(p);
-          const isAI = p.id.startsWith('ai_');
-          return `<div class="room-avatar${isAI ? ' room-avatar--ai' : ''}" title="${escapeHtml(title)}">${escapeHtml(initial)}</div>`;
-        }
-        return `<div class="room-avatar room-avatar--empty" title="空位">?</div>`;
-      }).join('');
-
-      return `
-        <div class="room-card" role="button" tabindex="0"
-             data-room-id="${escapeHtml(room.id)}"
-             aria-label="${isWaiting ? '加入' : '查看'}房间『${roomName}』">
-          <div class="room-card__header">
-            <span class="room-card__name">${roomName}</span>
-            <span class="room-card__badge ${badgeClass}">${badge}</span>
-          </div>
-          <div class="room-card__body">
-            <div class="room-card__players">${playerSlots}</div>
-            <div class="room-card__info">
-              <span class="room-card__chips">筹码 <strong>${chips}</strong></span>
-            </div>
-          </div>
-        </div>`;
-    }
-
-    function escapeHtml(s) {
-      return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    /* ── Load room list ────────────────────────────────────── */
-    let _roomsVersion = 0; // increment to force refresh
-
-    async function loadRooms() {
-      try {
-        const data = await apiFetch('/api/rooms');
-        const rooms = Array.isArray(data) ? data : (data.rooms || []);
-
-        // Update player name cache
-        (data.players || []).forEach(p => {
-          PLAYER_NAME_MAP[p.id] = p.name;
-        });
-
-        const listEl = document.getElementById('rooms-list');
-        const emptyEl = document.getElementById('empty-state');
-        const labelEl = document.getElementById('rooms-updated-label');
-
-        if (rooms.length === 0) {
-          listEl.innerHTML = '';
-          emptyEl.classList.remove('hidden');
-        } else {
-          emptyEl.classList.add('hidden');
-          listEl.innerHTML = rooms.map(r => renderRoomCard(r)).join('');
-
-          // Bind click handlers
-          listEl.querySelectorAll('.room-card').forEach(card => {
-            card.addEventListener('click', () => onRoomClick(card));
-            card.addEventListener('keydown', e => {
-              if (e.key === 'Enter' || e.key === ' ') onRoomClick(card);
-            });
-          });
-        }
-
-        // Stats
-        if (data.stats) {
-          document.getElementById('stat-online').textContent = data.stats.online ?? '—';
-          document.getElementById('stat-rooms').textContent = data.stats.rooms ?? rooms.length;
-          document.getElementById('stat-games').textContent = data.stats.games ?? '—';
-        } else {
-          document.getElementById('stat-online').textContent = '—';
-          document.getElementById('stat-rooms').textContent = rooms.length;
-          document.getElementById('stat-games').textContent = '—';
-        }
-
-        if (labelEl) {
-          const now = new Date();
-          labelEl.textContent = `更新 ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
-        }
-
-      } catch (err) {
-        console.error('loadRooms failed:', err);
-      }
-    }
-
-    async function onRoomClick(card) {
-      const roomId = card.dataset.roomId;
-      if (!roomId) return;
-
-      try {
-        const data = await apiFetch(`/api/rooms/${roomId}`);
-        const room = data.room || data;
-
-        if (room.status === 'playing') {
+    /* ── Room list interaction ─────────────────────────────── */
+    document.querySelectorAll('.room-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const name = card.querySelector('.room-card__name').textContent;
+        const badge = card.querySelector('.room-card__badge');
+        if (badge && badge.classList.contains('room-card__badge--playing')) {
+          /* show toast that game is in progress */
           showToast('对局进行中，请等待结束');
           return;
         }
+        /* TODO: navigate to game room */
+        showToast(`加入房间：${name}`);
+      });
 
-        // Join the room → navigate to game table
-        const params = new URLSearchParams({ room: roomId, player: myPlayerId });
-        location.href = `game-table.html?${params}`;
+      card.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') card.click();
+      });
+    });
 
-      } catch (err) {
-        console.error('join room error:', err);
-        showToast('加入房间失败，请重试');
-      }
-    }
-
-    /* ── Create room ───────────────────────────────────────── */
+    /* ── FAB open modal ─────────────────────────────────────── */
     const modal = document.getElementById('create-modal');
     const fab = document.getElementById('btn-create-room');
     const roomNameInput = document.getElementById('room-name');
@@ -1020,37 +919,13 @@
       if (e.target === modal) modal.classList.add('hidden');
     });
 
-    confirmBtn.addEventListener('click', async () => {
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = '创建中…';
-      try {
-        const name = roomNameInput.value.trim() || '翡翠阁';
-        const chips = parseInt(document.getElementById('room-chips').value) || 1000;
-
-        const data = await apiFetch('/api/rooms', {
-          method: 'POST',
-          body: JSON.stringify({ name, chips, player_id: myPlayerId }),
-        });
-
-        modal.classList.add('hidden');
-        roomNameInput.value = '';
-
-        const roomId = data.room_id || data.id;
-        showToast(`房间「${name}」已创建`);
-        await loadRooms(); // refresh list
-
-        // Auto-navigate to the new room
-        if (roomId) {
-          const params = new URLSearchParams({ room: roomId, player: myPlayerId });
-          setTimeout(() => { location.href = `game-table.html?${params}`; }, 800);
-        }
-      } catch (err) {
-        console.error('create room error:', err);
-        showToast('创建房间失败：' + err.message);
-      } finally {
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = '创建房间';
-      }
+    confirmBtn.addEventListener('click', () => {
+      const name = roomNameInput.value.trim() || '翡翠阁';
+      const chips = document.getElementById('room-chips').value || '1000';
+      /* TODO: POST /api/rooms then navigate */
+      showToast(`创建房间「${name}」，筹码 ${chips}`);
+      modal.classList.add('hidden');
+      roomNameInput.value = '';
     });
 
     /* ── Tab bar ───────────────────────────────────────────── */
@@ -1084,9 +959,8 @@
       }, 2200);
     }
 
-    /* ── Boot ───────────────────────────────────────────────── */
-    loadRooms();
-    setInterval(loadRooms, 5000); // auto-refresh every 5s
+    /* ── Mock online stat ─────────────────────────────────── */
+    document.getElementById('stat-online').textContent = Math.floor(Math.random() * 5 + 8);
   </script>
 </body>
 </html>

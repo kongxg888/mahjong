@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>对局回放 — 管理员后台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg-base:#18261E;--bg-base-alt:#1a2e22;--gold:#D4AF37;--gold-border:rgba(212,175,55,0.28);
+      --glass-bg:rgba(0,0,0,0.42);--glass-blur:blur(10px) saturate(140%);
+      --ink:#F5F5DC;--ink-muted:rgba(245,245,220,0.68);--ink-faint:rgba(255,255,255,0.40);
+      --radius-md:12px;--radius-lg:18px;--radius-xl:24px;
+      --font-display:'Noto Serif SC',Georgia,serif;
+    }
+    body{font-family:'Inter','Noto Sans SC',-apple-system,sans-serif;background-color:var(--bg-base);
+      background-image:radial-gradient(rgba(212,175,55,0.06) 1px,transparent 1px);background-size:26px 26px;
+      color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased}
+    .layout{display:flex;min-height:100vh}
+    .sidebar{width:240px;flex-shrink:0;background:var(--bg-base-alt);border-right:1px solid rgba(212,175,55,0.15);
+      display:flex;flex-direction:column;padding:20px 0;position:sticky;top:0;height:100vh;overflow-y:auto}
+    .sidebar-brand{display:flex;align-items:center;gap:10px;padding:0 20px 20px;border-bottom:1px solid rgba(212,175,55,0.12);margin-bottom:16px}
+    .sidebar-brand-icon{font-size:1.5rem}
+    .sidebar-brand-text{font-family:var(--font-display);font-size:1.1rem;font-weight:900;color:var(--gold);letter-spacing:0.05em}
+    .sidebar-nav{display:flex;flex-direction:column;gap:4px;padding:0 12px;flex:1}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-md);
+      color:var(--ink-muted);font-size:0.88rem;cursor:pointer;text-decoration:none;transition:all 0.15s}
+    .nav-item:hover{background:rgba(255,255,255,0.05);color:var(--ink)}
+    .nav-item.active{background:rgba(212,175,55,0.10);color:var(--gold);border:1px solid rgba(212,175,55,0.25)}
+    .nav-item svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+    .sidebar-footer{padding:16px 20px 0;border-top:1px solid rgba(212,175,55,0.10)}
+    .logout-btn{width:100%;padding:9px;background:rgba(180,50,50,0.25);border:1px solid rgba(200,80,80,0.35);
+      border-radius:var(--radius-md);color:#ffaaaa;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s}
+    .logout-btn:hover{background:rgba(180,50,50,0.40)}
+    .main{flex:1;padding:28px 32px;overflow-y:auto}
+    .page-header{display:flex;align-items:center;gap:16px;margin-bottom:28px}
+    .back-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-md);color:var(--ink-muted);
+      font-size:0.82rem;cursor:pointer;text-decoration:none;transition:all 0.15s}
+    .back-btn:hover{background:rgba(255,255,255,0.09);color:var(--ink)}
+    .back-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+    .page-title{font-family:var(--font-display);font-size:1.4rem;font-weight:900;color:var(--ink);letter-spacing:0.03em}
+    .game-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+    .meta-card{background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+      border:1px solid var(--gold-border);border-radius:var(--radius-lg);padding:16px 18px}
+    .meta-card__label{font-size:0.68rem;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px}
+    .meta-card__value{font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:var(--gold)}
+    .meta-card__value.small{font-size:0.85rem}
+    .players-section{margin-bottom:24px}
+    .section-title{font-family:var(--font-display);font-size:0.9rem;font-weight:700;color:var(--ink);
+      margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(212,175,55,0.15);
+      display:flex;align-items:center;gap:8px}
+    .section-title::before{content:'';display:block;width:3px;height:1em;background:var(--gold);border-radius:2px}
+    .players-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+    .player-result-card{background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+      border:1px solid var(--gold-border);border-radius:var(--radius-lg);padding:14px 16px;
+      display:flex;flex-direction:column;gap:6px}
+    .player-result-card.winner{border-color:var(--gold);box-shadow:0 0 12px rgba(212,175,55,0.18)}
+    .player-result-name{font-weight:700;font-size:0.9rem;color:var(--ink)}
+    .player-result-chips{font-size:0.78rem;color:var(--ink-muted)}
+    .player-result-chips .gain{color:#6fcf6f;font-weight:700}
+    .player-result-chips .loss{color:#eb5757}
+    .han-section{margin-bottom:24px}
+    .han-table{width:100%;border-collapse:collapse;font-size:0.85rem}
+    .han-table td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.06);color:var(--ink)}
+    .han-table td:last-child{text-align:right;font-weight:700;color:var(--gold)}
+    .han-table tfoot td{border-top:1px solid rgba(255,255,255,0.18);border-bottom:none;font-weight:900;color:var(--gold)}
+    .no-data{text-align:center;padding:40px;color:var(--ink-muted);font-size:0.9rem}
+    .loading{text-align:center;padding:60px;color:var(--ink-muted)}
+    .error-msg{text-align:center;padding:40px;color:#ffaaaa;font-size:0.9rem}
+    @media(max-width:768px){.sidebar{display:none}.main{padding:16px}.players-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <span class="sidebar-brand-icon">🀄</span>
+      <span class="sidebar-brand-text">温州麻将</span>
+    </div>
+    <div class="sidebar-nav">
+      <a class="nav-item" href="admin-dashboard.html">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        仪表盘
+      </a>
+      <a class="nav-item" href="admin-rooms.html">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        房间管理
+      </a>
+      <a class="nav-item" href="admin-players.html">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        玩家记录
+      </a>
+      <a class="nav-item" href="admin-games.html">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        对局记录
+      </a>
+    </div>
+    <div class="sidebar-footer">
+      <button class="logout-btn" id="btn-logout">退出登录</button>
+    </div>
+  </nav>
+  <main class="main">
+    <div class="page-header">
+      <a class="back-btn" href="admin-games.html">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        返回对局记录
+      </a>
+      <h1 class="page-title" id="page-title">对局回放</h1>
+    </div>
+    <div id="content">
+      <div class="loading">加载中…</div>
+    </div>
+  </main>
+</div>
+<script type="module">
+import { requireAuth } from './js/admin-auth.js';
+requireAuth();
+
+const API = '/api/admin';
+const params = new URLSearchParams(window.location.search);
+const gameId = params.get('id');
+
+if (!gameId) {
+  document.getElementById('content').innerHTML = '<div class="error-msg">缺少对局 ID 参数</div>';
+} else {
+  loadGame(gameId);
+}
+
+async function loadGame(id) {
+  try {
+    const [game, participants, hanList] = await Promise.all([
+      fetch(`${API}/games/${id}`).then(r => r.json()),
+      fetch(`${API}/games/${id}/participants`).then(r => r.json()),
+      fetch(`${API}/games/${id}/han`).then(r => r.ok ? r.json() : { han: [] })
+    ]);
+
+    const winner = participants.find(p => p.player_id === game.winner_id);
+
+    let html = `
+      <div class="game-meta">
+        <div class="meta-card">
+          <div class="meta-card__label">局数</div>
+          <div class="meta-card__value">${game.round_number || 1}/${game.total_rounds || 8} 局</div>
+        </div>
+        <div class="meta-card">
+          <div class="meta-card__label">赢家</div>
+          <div class="meta-card__value" style="color:var(--gold)">${winner ? escapeHtml(winner.player_name || winner.player_id) : '—'}</div>
+        </div>
+        <div class="meta-card">
+          <div class="meta-card__label">胡牌类型</div>
+          <div class="meta-card__value small">${game.win_type === 'zimo' ? '自摸' : game.win_type === 'rong' ? '荣和' : '流局'}</div>
+        </div>
+        <div class="meta-card">
+          <div class="meta-card__label">对局时间</div>
+          <div class="meta-card__value small">${new Date(game.created_at).toLocaleString('zh-CN')}</div>
+        </div>
+      </div>
+
+      <div class="players-section">
+        <div class="section-title">玩家结算</div>
+        <div class="players-grid">
+          ${participants.map(p => `
+            <div class="player-result-card ${p.player_id === game.winner_id ? 'winner' : ''}">
+              <div class="player-result-name ${p.player_id === game.winner_id ? 'winner-text' : ''}">
+                ${escapeHtml(p.player_name || p.player_id)}
+              </div>
+              <div class="player-result-chips">
+                累计 <strong>${p.cumulative_score ?? '—'}</strong> 筹码
+                &nbsp;
+                <span class="${(p.chip_change || 0) >= 0 ? 'gain' : 'loss'}">
+                  ${(p.chip_change || 0) >= 0 ? '+' : ''}${p.chip_change || 0}
+                </span>
+              </div>
+              ${p.hand_tiles ? `<div style="font-size:0.72rem;color:var(--ink-muted);margin-top:2px">手牌: ${escapeHtml(p.hand_tiles)}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    if (hanList.han && hanList.han.length > 0) {
+      const total = hanList.han.reduce((s, h) => s + (h.han_value || 0), 0);
+      html += `
+        <div class="han-section">
+          <div class="section-title">番数详情</div>
+          <table class="han-table">
+            <tbody>
+              ${hanList.han.map(h => `
+                <tr><td>${escapeHtml(h.han_name)}</td><td>×${h.han_value}</td></tr>
+              `).join('')}
+            </tbody>
+            <tfoot><tr><td>合计番数</td><td>${total} 番</td></tr></tfoot>
+          </table>
+        </div>
+      `;
+    }
+
+    document.getElementById('content').innerHTML = html;
+    document.getElementById('page-title').textContent = `对局 #${id} 回放`;
+
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="error-msg">加载失败：${e.message}</div>`;
+  }
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+document.getElementById('btn-logout').addEventListener('click', () => {
+  localStorage.removeItem('admin_token');
+  location.href = 'admin-login.html';
+});
+</script>
+</body>
+</html>

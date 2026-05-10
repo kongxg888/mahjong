@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>温州麻将 — 游戏桌</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ================================================================
+       GAME TABLE STYLES — 温州麻将
+       ================================================================
+       目录:
+       1. Design Tokens (CSS变量)
+       2. Base & Reset
+       3. Top Bar
+       4. Main Board Layout
+       5. Player Areas
+       6. Center Table & Discards
+       7. Tiles (手牌/对手牌/弃牌)
+       8. Action Bar
+       9. Status Bar
+       10. Claim Overlay (抢操作弹窗)
+       11. Game Over Modal (结算弹窗)
+       12. Deal Animations (发牌动画)
+       13. Responsive (响应式)
+       14. Utilities
+    ================================================================ */
+
+    /* ── 1. Design Tokens ──────────────────────────────────────── */
+    :root {
+      --bg-base:        #18261E;
+      --bg-base-alt:    #1a2e22;
+      --jade-dark:      #142d1c;
+      --jade-mid:       #1e3d28;
+      --gold:           #D4AF37;
+      --gold-light:     #E8C962;
+      --gold-dim:       rgba(212,175,55,0.12);
+      --gold-border:    rgba(212,175,55,0.28);
+      --gold-glow:      rgba(212,175,55,0.22);
+      --ink:            #F5F5DC;
+      --ink-muted:      rgba(245,245,220,0.68);
+      --ink-faint:      rgba(255,255,255,0.40);
+      --glass-bg:       rgba(0,0,0,0.42);
+      --glass-bg-light: rgba(255,255,255,0.05);
+      --glass-border:   rgba(212,175,55,0.28);
+      --glass-blur:     blur(10px) saturate(140%);
+      --felt-bg:        rgba(0,0,0,0.55);
+      --felt-border:    rgba(212,175,55,0.22);
+      --tile-bg:        #f5f0e0;
+      --tile-border:    #c8b87a;
+      --tile-back-bg:   #1a2e22;
+      --tile-back-fg:   rgba(212,175,55,0.50);
+      --tile-selected:  #D4AF37;
+      --text-light:     var(--ink);
+      --text-muted:     var(--ink-muted);
+      --accent:         var(--gold);
+      --btn-primary:    rgba(212,175,55,0.85);
+      --btn-hover:      rgba(212,175,55,1.0);
+      --btn-bg:         rgba(0,0,0,0.50);
+      --btn-border:     rgba(212,175,55,0.45);
+      --panel-bg:       var(--felt-bg);
+      --panel-border:   rgba(212,175,55,0.18);
+      --radius-sm:   6px;
+      --radius-md:  12px;
+      --radius-lg:  18px;
+      --radius-xl:  24px;
+      --radius-full: 9999px;
+      --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --duration-fast:   120ms;
+      --duration-normal: 220ms;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* ── 2. Base & Reset ───────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; touch-action: manipulation; }
+
+    body {
+      font-family: 'Noto Sans SC', 'PingFang SC', -apple-system, sans-serif;
+      background-color: var(--bg-base);
+      background-image:
+        radial-gradient(rgba(212,175,55,0.06) 1px, transparent 1px);
+      background-size: 26px 26px;
+      color: var(--ink);
+      min-height: 100dvh;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── 3. Top Bar ──────────────────────────────────────────── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--radius-sm);
+      padding: var(--radius-sm) var(--radius-md);
+      padding-top: calc(var(--radius-sm) + env(safe-area-inset-top, 0px));
+      background: rgba(0,0,0,0.60);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      border-bottom: 1px solid rgba(212,175,55,0.20);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    #topbar h1 {
+      font-family: 'Noto Serif SC', Georgia, serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.08em;
+      flex: 1;
+      text-align: center;
+    }
+
+    #topbar .back-link {
+      color: var(--ink-muted);
+      text-decoration: none;
+      font-size: 0.78rem;
+      padding: var(--radius-sm) var(--radius-sm);
+      border-radius: var(--radius-sm);
+      transition: color var(--duration-fast);
+      white-space: nowrap;
+    }
+    #topbar .back-link:hover { color: var(--ink); }
+
+    #room-info {
+      font-size: 0.68rem;
+      color: var(--ink-faint);
+      text-align: center;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .conn-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      color: var(--ink-muted);
+      flex-shrink: 0;
+    }
+
+    .conn-indicator {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #888;
+      flex-shrink: 0;
+    }
+    .conn-indicator.connected    { background: #4caf50; box-shadow: 0 0 4px rgba(76,175,80,0.6); }
+    .conn-indicator.disconnected { background: #e05050; }
+    .conn-indicator.connecting   { background: #d0a030; animation: pulse-dot 1s infinite; }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.35; }
+    }
+
+    #btn-speech {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--ink-muted);
+      width: 34px; height: 34px;
+      border-radius: var(--radius-sm);
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background var(--duration-fast), border-color var(--duration-fast);
+      flex-shrink: 0;
+    }
+    #btn-speech:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.25); }
+    #btn-speech:active { transform: scale(0.93); }
+    #btn-speech.muted { opacity: 0.4; }
+
+    /* ── 4. Main Board Layout ───────────────────────────────── */
+    .board-wrapper {
+      flex: 1;
+      display: grid;
+      grid-template-areas:
+        ".      top      ."
+        "left   center   right"
+        ".      bottom   .";
+      grid-template-columns: 180px 1fr 180px;
+      grid-template-rows: 130px 1fr 150px;
+      gap: 5px;
+      padding: 5px;
+      min-height: 0;
+      overflow: visible;
+    }
+
+    /* ── 5. Player Areas ───────────────────────────────────── */
+    .player-area {
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 6px;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+      transition: border-color var(--duration-normal), box-shadow var(--duration-normal);
+    }
+
+    .player-area.active-turn {
+      border-color: var(--gold);
+      box-shadow: 0 0 16px rgba(212,175,55,0.30), inset 0 0 8px rgba(212,175,55,0.08);
+    }
+
+    #area-bottom {
+      background: var(--felt-bg);
+      border: 1px solid var(--felt-border);
+      border-radius: var(--radius-lg);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 5px;
+      overflow: visible;
+    }
+    #area-bottom.active-turn {
+      border-color: var(--gold);
+      box-shadow: 0 0 16px rgba(212,175,55,0.30);
+    }
+
+    #area-top    { grid-area: top; }
+    #area-left   { grid-area: left; }
+    #area-right  { grid-area: right; }
+    #area-center { grid-area: center; }
+
+    /* ── Player Labels ────────────────────────────────────── */
+    .player-label {
+      font-size: 0.70rem;
+      color: var(--ink-muted);
+      text-align: center;
+      font-weight: 500;
+      line-height: 1.3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .player-label .player-name {
+      color: var(--ink);
+      font-weight: 600;
+      font-size: 0.75rem;
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .player-label .player-score {
+      color: var(--gold);
+      font-size: 0.68rem;
+    }
+
+    .dealer-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px 5px;
+      background: linear-gradient(135deg, var(--gold), var(--gold-light));
+      color: var(--bg-base);
+      font-size: 0.68rem;
+      font-weight: 900;
+      border-radius: 3px;
+      letter-spacing: 0.03em;
+      flex-shrink: 0;
+    }
+
+    /* ── 6. Center Table & Discards ──────────────────────────── */
+    #area-center {
+      background: var(--felt-bg);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--felt-border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      padding: 7px;
+      gap: 5px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .center-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+      flex-shrink: 0;
+      gap: var(--radius-sm);
+    }
+
+    .wall-info { font-size: 0.80rem; }
+    .wall-info span { color: var(--gold); font-weight: 700; font-family: 'Noto Serif SC', serif; }
+
+    #center-phase {
+      color: var(--gold);
+      font-size: 0.78rem;
+      font-weight: 600;
+      flex: 1;
+      text-align: center;
+    }
+
+    #last-discard {
+      font-size: 0.75rem;
+      color: var(--ink-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    /* ── Discard Grid ──────────────────────────────────────── */
+    .discards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      grid-template-areas:
+        "left-pile  top-pile"
+        "my-pile    right-pile";
+      gap: 4px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .discard-pile {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius-md);
+      padding: 3px;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 1px;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .discard-pile.my-discard-pile {
+      border-color: var(--gold-border);
+      background: rgba(212,175,55,0.06);
+    }
+
+    .discard-pile-label {
+      width: 100%;
+      font-size: 0.60rem;
+      color: var(--ink-muted);
+      text-align: center;
+      flex-shrink: 0;
+      margin-bottom: 2px;
+    }
+
+    .discard-pile.my-discard-pile .discard-pile-label {
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    /* ── Hand Tiles ────────────────────────────────────────── */
+    .opponent-hand,
+    .my-hand {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 0;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    #my-hand-label {
+      font-size: 0.70rem;
+      color: var(--ink-muted);
+      align-self: flex-start;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-left: 2px;
+    }
+
+    #my-hand {
+      overflow-x: auto;
+      overflow-y: visible;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      padding: 12px 3px 3px;
+      max-width: 100%;
+      gap: 0;
+    }
+
+    #my-melds {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      justify-content: center;
+      max-width: 100%;
+    }
+
+    /* Left/right opponent hands — vertical stack */
+    #area-left .opponent-hand,
+    #area-right .opponent-hand {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-height: 110px;
+      overflow: hidden;
+    }
+
+    /* ── 7. Tiles ──────────────────────────────────────────── */
+    .tile {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: visible;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      cursor: default;
+      user-select: none;
+      transition: transform var(--duration-fast) var(--ease-spring),
+                  filter var(--duration-fast);
+      position: relative;
+    }
+
+    .tile-img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    .tile-main {
+      font-family: 'Noto Serif SC', 'Source Han Serif CN', 'SimSun', serif;
+      font-size: 1.05em;
+      font-weight: 900;
+      color: #1a1a1a;
+      line-height: 1;
+    }
+
+    .tile-back {
+      background: var(--tile-back-bg);
+      border: 1.5px solid var(--tile-back-fg);
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+    }
+    .tile-back::after {
+      content: '🀫';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75em;
+      opacity: 0.6;
+    }
+
+    /* Hand tiles — clickable */
+    #my-hand .tile {
+      width: 36px;
+      height: 50px;
+      cursor: pointer;
+      margin-right: -5px;
+    }
+    #my-hand .tile:last-child { margin-right: 0; }
+
+    @media (hover: hover) {
+      #my-hand .tile:hover {
+        transform: translateY(-7px);
+        filter: drop-shadow(0 6px 10px rgba(0,0,0,0.5));
+        z-index: 5;
+      }
+    }
+
+    /* Selected tile */
+    #my-hand .tile.selected {
+      position: relative;
+      z-index: 50;
+      transform: translateY(-10px);
+      filter: drop-shadow(0 0 3px rgba(255,255,255,0.8))
+              drop-shadow(0 0 8px var(--gold))
+              drop-shadow(0 0 16px rgba(212,175,55,0.5))
+              drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+    }
+
+    /* Opponent hand tiles */
+    .opponent-hand .tile {
+      width: 18px;
+      height: 26px;
+    }
+
+    /* Discard pile tiles */
+    .discard-pile .tile {
+      width: 22px;
+      height: 30px;
+      transition: none;
+    }
+
+    /* Meld groups */
+    .meld-group {
+      display: inline-flex;
+      gap: 0;
+      margin-right: 3px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+      background: rgba(0,0,0,0.25);
+    }
+    .meld-group .tile {
+      width: 20px;
+      height: 28px;
+    }
+
+    /* My melds */
+    #my-melds .tile {
+      width: 28px;
+      height: 40px;
+      margin-left: 2px;
+    }
+    #my-melds .tile:first-child { margin-left: 0; }
+
+    /* Winning tile highlight */
+    .tile.tile-winning {
+      outline: 2px solid var(--gold);
+      outline-offset: 2px;
+      filter: drop-shadow(0 0 6px var(--gold)) drop-shadow(0 0 2px var(--gold));
+      z-index: 1;
+    }
+
+    /* ── 8. Action Bar ─────────────────────────────────────── */
+    #action-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 6px 10px;
+      border-top: 1px solid rgba(212,175,55,0.15);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    #action-bar .btn {
+      min-width: 70px;
+      height: 42px;
+      padding: 0 12px;
+      border-radius: var(--radius-md);
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all var(--duration-fast) var(--ease-out);
+      border: 1.5px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      white-space: nowrap;
+      touch-action: manipulation;
+    }
+
+    #action-bar .btn:active:not(:disabled) { transform: scale(0.95); }
+
+    #action-bar .btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ── Button Variants ──────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-md);
+      font-size: 0.88rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      transition: all var(--duration-fast) var(--ease-out);
+      touch-action: manipulation;
+      white-space: nowrap;
+    }
+    .btn:active:not(:disabled) { transform: scale(0.95); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, rgba(212,175,55,0.85), rgba(212,175,55,0.70));
+      border-color: var(--gold);
+      color: var(--bg-base);
+      box-shadow: 0 3px 12px rgba(212,175,55,0.25);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: linear-gradient(135deg, var(--gold), var(--gold-light));
+      box-shadow: 0 5px 18px rgba(212,175,55,0.40);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.18);
+      color: var(--ink-muted);
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(255,255,255,0.10);
+      border-color: rgba(255,255,255,0.28);
+      color: var(--ink);
+    }
+
+    .btn-danger {
+      background: rgba(180,50,50,0.75);
+      border-color: rgba(220,80,80,0.5);
+      color: #ffcccc;
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(200,60,60,0.85);
+    }
+
+    .btn-success {
+      background: rgba(40,120,60,0.75);
+      border-color: rgba(60,160,80,0.5);
+      color: #ccffcc;
+    }
+    .btn-success:hover:not(:disabled) {
+      background: rgba(50,150,70,0.85);
+    }
+
+    .btn-info {
+      background: rgba(30,80,150,0.75);
+      border-color: rgba(60,120,200,0.5);
+      color: #ccdeff;
+    }
+    .btn-info:hover:not(:disabled) {
+      background: rgba(40,100,180,0.85);
+    }
+
+    /* Action-bar specific buttons */
+    #btn-discard {
+      background: rgba(150,40,40,0.80);
+      border-color: rgba(200,80,80,0.45);
+      color: #ffdddd;
+    }
+    #btn-discard:hover:not(:disabled) {
+      background: rgba(170,50,50,0.90);
+      border-color: rgba(220,100,100,0.55);
+    }
+
+    #btn-pung {
+      background: rgba(30,80,150,0.80);
+      border-color: rgba(60,120,200,0.50);
+      color: #ccdeff;
+    }
+    #btn-pung:hover:not(:disabled) { background: rgba(40,100,180,0.90); }
+
+    #btn-chow {
+      background: rgba(30,120,70,0.80);
+      border-color: rgba(50,160,100,0.50);
+      color: #ccffdd;
+    }
+    #btn-chow:hover:not(:disabled) { background: rgba(40,140,80,0.90); }
+
+    #btn-kong {
+      background: rgba(90,50,150,0.80);
+      border-color: rgba(130,80,200,0.50);
+      color: #eeddff;
+    }
+    #btn-kong:hover:not(:disabled) { background: rgba(110,60,180,0.90); }
+
+    #btn-win {
+      background: linear-gradient(135deg, rgba(212,175,55,0.85), rgba(180,140,20,0.90));
+      border-color: var(--gold);
+      color: var(--bg-base);
+      font-weight: 900;
+      box-shadow: 0 3px 14px rgba(212,175,55,0.35);
+    }
+    #btn-win:hover:not(:disabled) {
+      box-shadow: 0 5px 22px rgba(212,175,55,0.50);
+      transform: translateY(-1px);
+    }
+
+    #btn-skip {
+      background: rgba(80,60,60,0.70);
+      border-color: rgba(150,110,110,0.35);
+      color: rgba(245,245,220,0.70);
+    }
+    #btn-skip:hover:not(:disabled) {
+      background: rgba(100,75,75,0.80);
+    }
+
+    #btn-start {
+      background: linear-gradient(135deg, rgba(40,90,60,0.85), rgba(30,70,50,0.90));
+      border: 1.5px solid rgba(60,150,90,0.55);
+      color: #aaffcc;
+    }
+    #btn-start:hover:not(:disabled) {
+      background: linear-gradient(135deg, rgba(50,110,70,0.90), rgba(40,90,60,0.95));
+      box-shadow: 0 4px 16px rgba(60,150,90,0.30);
+    }
+
+    /* ── 9. Status Bar ──────────────────────────────────────── */
+    #status-bar {
+      text-align: center;
+      padding: 4px 12px;
+      font-size: 0.78rem;
+      background: rgba(0,0,0,0.50);
+      border-top: 1px solid rgba(212,175,55,0.10);
+      min-height: 1.8rem;
+      flex-shrink: 0;
+      color: var(--ink-muted);
+      transition: background var(--duration-normal);
+    }
+    #status-bar.error   { background: rgba(120,20,20,0.65); color: #ffaaaa; }
+    #status-bar.success { background: rgba(20,80,30,0.60);  color: #aaffaa; }
+    #status-bar.info    { background: rgba(20,50,100,0.55);  color: #aaccff; }
+
+    /* ── 10. Claim Overlay ──────────────────────────────────── */
+    .claim-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      pointer-events: none;
+    }
+    .claim-overlay > * { pointer-events: auto; }
+    .claim-overlay.hidden { display: none; }
+    .claim-overlay:not(.hidden) { animation: fadeIn var(--duration-normal) var(--ease-out); }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .claim-box {
+      background: var(--bg-base-alt);
+      border: 1.5px solid var(--gold);
+      border-radius: var(--radius-xl);
+      padding: 24px 20px;
+      text-align: center;
+      min-width: 300px;
+      max-width: 360px;
+      width: 90vw;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.3), 0 0 30px rgba(212,175,55,0.15);
+      max-height: 92vh;
+      overflow-y: auto;
+    }
+
+    .claim-box h3 {
+      font-family: 'Noto Serif SC', serif;
+      color: var(--gold);
+      font-size: 1.05rem;
+      margin-bottom: 14px;
+      letter-spacing: 0.05em;
+    }
+
+    .claim-countdown-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+    }
+
+    .claim-countdown {
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: var(--gold);
+      font-family: 'Noto Serif SC', serif;
+      min-width: 2ch;
+      display: inline-block;
+    }
+
+    .claim-countdown-bar.urgent { color: #ff9944; }
+    .claim-countdown-bar.urgent .claim-countdown { color: #ff4444; animation: pulse-scale 1s ease-in-out infinite; }
+    @keyframes pulse-scale { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2)} }
+
+    .claim-tile-display {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+
+    .claim-tile-display .tile {
+      width: 64px;
+      height: 90px;
+    }
+
+    .claim-tile-name {
+      font-size: 0.82rem;
+      color: var(--ink-muted);
+      margin-bottom: 14px;
+      display: block;
+    }
+    .claim-tile-name strong { color: var(--gold); font-size: 1rem; }
+
+    .claim-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .claim-actions .btn {
+      min-width: 68px;
+      min-height: 40px;
+      font-size: 0.82rem;
+    }
+
+    /* ── 11. Game Over Modal ──────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.50);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      pointer-events: none;
+    }
+    .modal-overlay > * { pointer-events: auto; }
+    .modal-overlay.hidden { display: none; }
+    .modal-overlay:not(.hidden) { animation: fadeIn 0.2s var(--ease-out); }
+
+    .modal-box {
+      background: var(--bg-base-alt);
+      border: 1.5px solid var(--gold);
+      border-radius: var(--radius-xl);
+      padding: 28px 24px;
+      text-align: center;
+      max-width: 460px;
+      width: 92%;
+      max-height: 88vh;
+      overflow-y: auto;
+      box-shadow: 0 16px 64px rgba(0,0,0,0.75), 0 0 0 1px rgba(0,0,0,0.3), 0 0 40px rgba(212,175,55,0.12);
+    }
+
+    .modal-box h2 {
+      font-family: 'Noto Serif SC', serif;
+      font-size: 1.7rem;
+      font-weight: 900;
+      color: var(--gold);
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .modal-box .winner-name {
+      font-size: 1.05rem;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .modal-box .winner-name strong { color: var(--gold); }
+
+    #win-type-label {
+      font-size: 0.82rem;
+      color: var(--ink-muted);
+      margin-bottom: 12px;
+    }
+
+    #round-number-label {
+      font-size: 0.78rem;
+      color: var(--ink-faint);
+      margin-bottom: 12px;
+    }
+
+    .scores-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 0.85rem;
+    }
+
+    .scores-table th, .scores-table td {
+      padding: 6px 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .scores-table th { color: var(--ink-muted); font-size: 0.75rem; font-weight: 600; }
+    .scores-table td { color: var(--ink); }
+    .scores-table tr.winner-row td { color: var(--gold); font-weight: 700; }
+    .scores-table td.chip-gain  { color: #6fcf6f; font-weight: 700; }
+    .scores-table td.chip-loss  { color: #eb5757; }
+    .scores-table td.chip-zero  { color: var(--ink-muted); }
+
+    /* Han breakdown */
+    .han-section { margin: 10px 0 14px; text-align: left; }
+    .han-section.hidden { display: none; }
+
+    .han-section-title {
+      font-size: 0.75rem;
+      color: var(--gold);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .han-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .han-table td {
+      padding: 4px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      color: var(--ink);
+    }
+    .han-table td:last-child { text-align: right; font-weight: 700; color: var(--gold); }
+    .han-table tfoot .han-total-row td {
+      border-top: 1px solid rgba(255,255,255,0.18);
+      border-bottom: none;
+      padding-top: 6px;
+      font-weight: 900;
+      color: var(--gold);
+    }
+
+    .modal-actions {
+      margin-top: 18px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .modal-actions .btn {
+      flex: 1;
+      min-width: 120px;
+      padding: 0.6rem 1rem;
+      font-size: 0.85rem;
+    }
+
+    /* ── 12. Deal Animations ───────────────────────────────── */
+    .board-wrapper { transition: opacity 0.15s ease; }
+    .board-wrapper.board-dealing { opacity: 0; transition: none; }
+
+    @keyframes deal-from-bottom {
+      0%  { opacity:0; transform:translateY(55px) scale(0.65) rotateX(70deg); }
+      60% { opacity:1; transform:translateY(-5px) scale(1.08) rotateX(0deg); }
+      100%{ opacity:1; transform:translateY(0) scale(1) rotateX(0deg); }
+    }
+    @keyframes deal-from-top {
+      0%  { opacity:0; transform:translateY(-45px) scale(0.65); }
+      60% { opacity:1; transform:translateY(4px) scale(1.08); }
+      100%{ opacity:1; transform:translateY(0) scale(1); }
+    }
+    @keyframes deal-from-left {
+      0%  { opacity:0; transform:translateX(-45px) scale(0.65); }
+      60% { opacity:1; transform:translateX(4px) scale(1.08); }
+      100%{ opacity:1; transform:translateX(0) scale(1); }
+    }
+    @keyframes deal-from-right {
+      0%  { opacity:0; transform:translateX(45px) scale(0.65); }
+      60% { opacity:1; transform:translateX(-4px) scale(1.08); }
+      100%{ opacity:1; transform:translateX(0) scale(1); }
+    }
+    @keyframes deal-shimmer {
+      0%  { box-shadow: inset 0 0 0 0 rgba(212,175,55,0); }
+      40% { box-shadow: inset 0 0 28px 8px rgba(212,175,55,0.55); }
+      100%{ box-shadow: inset 0 0 0 0 rgba(212,175,55,0); }
+    }
+
+    .tile.deal-in-bottom { animation: deal-from-bottom 0.38s cubic-bezier(0.22,0.61,0.36,1) both; }
+    .tile.deal-in-top    { animation: deal-from-top    0.30s cubic-bezier(0.22,0.61,0.36,1) both; }
+    .tile.deal-in-left   { animation: deal-from-left   0.30s cubic-bezier(0.22,0.61,0.36,1) both; }
+    .tile.deal-in-right  { animation: deal-from-right  0.30s cubic-bezier(0.22,0.61,0.36,1) both; }
+
+    /* ── 13. Responsive ────────────────────────────────────── */
+    @media (max-width: 1100px) {
+      .board-wrapper {
+        grid-template-columns: 150px 1fr 150px;
+        grid-template-rows: 115px 1fr 140px;
+      }
+    }
+
+    /* ── Mobile ──────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      #room-info { display: none; }
+      #topbar h1 { font-size: 0.85rem; letter-spacing: 0; }
+
+      /* top player — full width, horizontal */
+      #area-top .player-label {
+        flex-direction: row;
+        gap: 6px;
+        font-size: 0.65rem;
+      }
+      #area-top .player-label .player-name {
+        max-width: 130px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #area-top .player-label .player-score { white-space: nowrap; flex-shrink: 0; }
+
+      /* left/right — compact, hide name text, show dealer + score */
+      #area-left .player-label,
+      #area-right .player-label {
+        flex-direction: column;
+        gap: 1px;
+        max-width: 68px;
+        overflow: hidden;
+      }
+      #area-left .player-label .player-name,
+      #area-right .player-label .player-name {
+        font-size: 0;
+        line-height: 0;
+      }
+      #area-left .player-label .dealer-badge,
+      #area-right .player-label .dealer-badge {
+        font-size: 0.70rem;
+        line-height: 1.2;
+      }
+      #area-left .player-label .player-score,
+      #area-right .player-label .player-score {
+        font-size: 0.55rem;
+        white-space: nowrap;
+      }
+
+      .board-wrapper {
+        grid-template-areas:
+          "top    top    top"
+          "left   center right"
+          "bottom bottom bottom";
+        grid-template-columns: 68px 1fr 68px;
+        grid-template-rows: minmax(70px, 13%) minmax(70px, 1fr) minmax(130px, 34%);
+      }
+
+      #my-hand {
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      #my-hand .tile { width: 32px !important; height: 46px !important; }
+
+      #my-melds .tile { width: 22px !important; height: 32px !important; }
+
+      #area-left .opponent-hand,
+      #area-right .opponent-hand {
+        flex-wrap: wrap;
+        max-height: none;
+        overflow: hidden;
+      }
+
+      #action-bar { position: relative; z-index: 10; }
+      #action-bar .btn {
+        min-height: 44px;
+        min-width: 66px;
+        font-size: 0.80rem;
+        padding: 0 8px;
+      }
+
+      /* Claim overlay — bottom sheet on mobile */
+      .claim-overlay { align-items: flex-end; }
+      .claim-box {
+        width: 100%;
+        max-width: 100%;
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        max-height: 55vh;
+        padding: 20px 16px calc(20px + var(--safe-bottom));
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .claim-tile-display .tile { width: 56px !important; height: 78px !important; }
+
+      /* Game over modal — bottom sheet */
+      .modal-overlay { align-items: flex-end; }
+      .modal-box {
+        width: 100%;
+        max-width: 100%;
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        max-height: 70vh;
+        padding: 22px 16px calc(22px + var(--safe-bottom));
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .modal-actions { flex-direction: column; }
+      .modal-actions .btn { width: 100%; min-width: unset; }
+    }
+
+    /* ── 14. Utilities ────────────────────────────────────── */
+    .hidden { display: none !important; }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+  <!-- ── TOP BAR ────────────────────────────────────────────── -->
+  <div id="topbar">
+    <a class="back-link" href="index.html">← 大厅</a>
+    <h1>温州麻将</h1>
+    <div id="room-info">Connecting…</div>
+    <div class="conn-status">
+      <span class="conn-indicator connecting" id="conn-dot"></span>
+      <span id="conn-text" style="font-size:0.70rem;">Connecting</span>
+    </div>
+    <button id="btn-speech" class="btn" title="语音开关" aria-label="语音开关">
+      <span id="speech-icon">🔊</span>
+    </button>
+  </div>
+
+  <!-- ── GAME BOARD ─────────────────────────────────────────── -->
+  <div class="board-wrapper">
+
+    <!-- TOP PLAYER -->
+    <div id="area-top" class="player-area">
+      <div class="player-label" id="top-label">
+        <span class="player-name">–</span>
+        <span class="player-score">筹码: –</span>
+      </div>
+      <div class="opponent-hand" id="top-hand"></div>
+      <div class="opp-melds" id="top-melds" style="display:flex;flex-wrap:wrap;gap:2px;justify-content:center;"></div>
+    </div>
+
+    <!-- LEFT PLAYER -->
+    <div id="area-left" class="player-area">
+      <div class="player-label" id="left-label">
+        <span class="player-name">–</span>
+        <span class="player-score">筹码: –</span>
+      </div>
+      <div class="opponent-hand" id="left-hand"></div>
+      <div class="opp-melds" id="left-melds" style="display:flex;flex-wrap:wrap;gap:2px;justify-content:center;"></div>
+    </div>
+
+    <!-- CENTER TABLE -->
+    <div id="area-center">
+      <div class="center-top-row">
+        <div class="wall-info">牌墙 <span id="wall-count">–</span></div>
+        <div id="center-phase"></div>
+        <div id="last-discard"></div>
+      </div>
+      <div class="discards-grid">
+        <div class="discard-pile" id="discard-pile-0"><div class="discard-pile-label">P1</div></div>
+        <div class="discard-pile" id="discard-pile-1"><div class="discard-pile-label">P2</div></div>
+        <div class="discard-pile" id="discard-pile-2"><div class="discard-pile-label">P3</div></div>
+        <div class="discard-pile" id="discard-pile-3"><div class="discard-pile-label">P4</div></div>
+      </div>
+    </div>
+
+    <!-- RIGHT PLAYER -->
+    <div id="area-right" class="player-area">
+      <div class="player-label" id="right-label">
+        <span class="player-name">–</span>
+        <span class="player-score">筹码: –</span>
+      </div>
+      <div class="opponent-hand" id="right-hand"></div>
+      <div class="opp-melds" id="right-melds" style="display:flex;flex-wrap:wrap;gap:2px;justify-content:center;"></div>
+    </div>
+
+    <!-- BOTTOM — MY HAND -->
+    <div id="area-bottom" class="player-area">
+      <div id="my-hand-label">
+        <span id="my-player-name" class="player-name" style="font-size:0.75rem;">–</span>
+        <span id="my-player-score" class="player-score">筹码: –</span>
+      </div>
+      <div class="my-hand" id="my-hand"></div>
+      <div class="my-melds" id="my-melds"></div>
+    </div>
+
+  </div><!-- /board-wrapper -->
+
+  <!-- ── ACTION BAR ─────────────────────────────────────────── -->
+  <div id="action-bar">
+    <button class="btn" id="btn-start">开始</button>
+    <button class="btn" id="btn-discard" disabled>出牌</button>
+    <button class="btn hidden" id="btn-pung"  disabled>碰</button>
+    <button class="btn hidden" id="btn-chow"  disabled>吃</button>
+    <button class="btn hidden" id="btn-kong"  disabled>杠</button>
+    <button class="btn hidden" id="btn-win"   disabled>胡!</button>
+    <button class="btn hidden" id="btn-skip"  disabled>过</button>
+  </div>
+
+  <!-- ── STATUS BAR ─────────────────────────────────────────── -->
+  <div id="status-bar">正在连接游戏服务器…</div>
+
+  <!-- ── CLAIM OVERLAY ─────────────────────────────────────── -->
+  <div class="claim-overlay hidden" id="claim-overlay">
+    <div class="claim-box">
+      <h3>可抢操作</h3>
+      <div class="claim-countdown-bar" id="claim-countdown-bar">
+        <span class="claim-countdown-label">自动跳过 </span>
+        <span class="claim-countdown" id="claim-countdown">30</span>
+        <span class="claim-countdown-label">s</span>
+      </div>
+      <div class="claim-tile-display" id="claim-tile-display"></div>
+      <span class="claim-tile-name">牌面：<strong id="claim-tile-name" data-tile=""></strong></span>
+      <div class="claim-actions" id="claim-actions-btns"></div>
+    </div>
+  </div>
+
+  <!-- ── GAME OVER MODAL ────────────────────────────────────── -->
+  <div class="modal-overlay hidden" id="game-over-modal">
+    <div class="modal-box">
+      <h2>游戏结束</h2>
+      <div class="winner-name">赢家：<strong id="winner-name">–</strong></div>
+      <div id="win-type-label"></div>
+      <div id="round-number-label"></div>
+
+      <div id="han-breakdown-section" class="han-section hidden">
+        <div class="han-section-title">番数详情</div>
+        <table class="han-table">
+          <tbody id="han-body"></tbody>
+          <tfoot>
+            <tr class="han-total-row">
+              <td>合计</td>
+              <td id="han-total">–</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <table class="scores-table">
+        <thead>
+          <tr><th>玩家</th><th>本局</th><th>累计</th></tr>
+        </thead>
+        <tbody id="scores-body"></tbody>
+      </table>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btn-close-modal">关闭</button>
+        <button class="btn btn-primary"  id="btn-play-again">再来一局</button>
+        <button class="btn btn-secondary" id="btn-back-lobby">返回大厅</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GAME LOGIC ─────────────────────────────────────────── -->
+  <!-- game.js is injected here — all game logic (WebSocket, render, actions)
+       is preserved verbatim from the original codebase. Only CSS/styling changes. -->
+  <script src="js/speech.js?v=20260225e"></script>
+  <script src="js/game.js?v=20260225e"></script>
+  <script>
+    /* ================================================================
+       UI PATCHES
+       覆盖 game.js 中的 render 函数，使用预建的 HTML 元素
+       而不是动态创建 DOM
+    ================================================================ */
+    (function patchGameUI() {
+
+      /* ── Helper: HTML 转义 ─────────────────────────────────── */
+      function escapeHtmlLocal(str) {
+        if (str == null) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      /* ── renderOpponent ──────────────────────────────────────
+         渲染对手区域: 标签 + 手牌(背面) + 副露
+      ─────────────────────────────────────────────────────────── */
+      window.renderOpponent = function(player, playerIdx, position, state, discardPile) {
+        const labelEl = document.getElementById(`${position}-label`);
+        const handEl  = document.getElementById(`${position}-hand`);
+        const meldsEl = document.getElementById(`${position}-melds`);
+        const areaEl  = document.getElementById(`area-${position}`);
+
+        if (areaEl) {
+          const shouldBeActive = state.current_turn === playerIdx;
+          if (areaEl.classList.contains('active-turn') !== shouldBeActive) {
+            areaEl.classList.toggle('active-turn', shouldBeActive);
+          }
+        }
+
+        if (labelEl) {
+          const chips = (state.cumulative_scores || {})[player.id] ?? '–';
+          const isDealer = state.dealer_idx === playerIdx;
+          const labelKey = `${player.id}|${chips}|${isDealer}`;
+          if (labelEl.dataset.labelKey !== labelKey) {
+            labelEl.dataset.labelKey = labelKey;
+            const dealerBadge = isDealer ? '<span class="dealer-badge">庄</span>' : '';
+            labelEl.innerHTML = `<span class="player-name">${escapeHtmlLocal(player.id)}${dealerBadge}</span>
+              <span class="player-score">筹码: ${chips}</span>`;
+          }
+        }
+
+        if (handEl) {
+          const w = position === 'left' || position === 'right' ? '18px' : '20px';
+          const h = position === 'left' || position === 'right' ? '26px' : '28px';
+
+          if (window._endReveal) {
+            const rw = position === 'left' || position === 'right' ? '22px' : '26px';
+            const rh = position === 'left' || position === 'right' ? '31px' : '36px';
+            const tiles = getHandTiles(player);
+            const winnerIdx = state.winner
+              ? (state.players || []).findIndex(p => p.id === state.winner)
+              : -1;
+            const winTile   = state.winning_tile || null;
+            const revealKey = tiles.join(',') + '|reveal|' + (winTile || '');
+            if (handEl.dataset.tilesKey !== revealKey) {
+              handEl.dataset.tilesKey = revealKey;
+              handEl.innerHTML = '';
+              let winMarked = false;
+              tiles.forEach(t => {
+                const isWin = !winMarked && t === winTile && playerIdx === winnerIdx;
+                if (isWin) winMarked = true;
+                const el = makeTileEl(t, { winning: isWin });
+                el.style.width  = rw;
+                el.style.height = rh;
+                handEl.appendChild(el);
+              });
+            }
+          } else {
+            if ((handEl.dataset.tilesKey || '').includes('|reveal|')) {
+              handEl.innerHTML = '';
+              delete handEl.dataset.tilesKey;
+            }
+            const tileCount    = getHandCount(player);
+            const currentCount = handEl.querySelectorAll('.tile-back').length;
+            if (currentCount < tileCount) {
+              for (let i = currentCount; i < tileCount; i++) {
+                const el = document.createElement('span');
+                el.className = 'tile tile-back';
+                el.style.width  = w;
+                el.style.height = h;
+                handEl.appendChild(el);
+              }
+            } else if (currentCount > tileCount) {
+              const btiles = [...handEl.querySelectorAll('.tile-back')];
+              for (let i = tileCount; i < currentCount; i++) btiles[i].remove();
+            }
+          }
+        }
+
+        if (meldsEl) {
+          const flowers      = player.flowers || [];
+          const revealSuffix = window._endReveal ? '|reveal|' + flowers.join(',') : '';
+          const newMeldsKey  = JSON.stringify(player.melds || []) + revealSuffix;
+          if (meldsEl.dataset.meldsKey !== newMeldsKey) {
+            meldsEl.dataset.meldsKey = newMeldsKey;
+            meldsEl.innerHTML = '';
+            (player.melds || []).forEach(meld => {
+              const group = document.createElement('span');
+              group.className = 'meld-group';
+              meld.forEach(t => {
+                const te = makeTileEl(t);
+                te.style.width  = '16px';
+                te.style.height = '22px';
+                group.appendChild(te);
+              });
+              meldsEl.appendChild(group);
+            });
+            if (window._endReveal && flowers.length) {
+              const sep = document.createElement('span');
+              sep.style.cssText = 'font-size:0.65rem;opacity:0.6;margin:0 2px;display:inline-flex;align-items:center;';
+              sep.textContent = '🌸';
+              meldsEl.appendChild(sep);
+              flowers.forEach(t => {
+                const te = makeTileEl(t);
+                te.style.width  = '16px';
+                te.style.height = '22px';
+                meldsEl.appendChild(te);
+              });
+            }
+          }
+        }
+      };
+
+      window.renderMyHand = function(player, playerIdx, state) {
+        const handEl  = document.getElementById('my-hand');
+        const meldsEl = document.getElementById('my-melds');
+        const nameEl  = document.getElementById('my-player-name');
+        const scoreEl = document.getElementById('my-player-score');
+
+        if (nameEl) {
+          const isDealer = state.dealer_idx === playerIdx;
+          const nameKey  = `${player.id}|${isDealer}`;
+          if (nameEl.dataset.nameKey !== nameKey) {
+            nameEl.dataset.nameKey = nameKey;
+            const dealerBadge = isDealer ? '<span class="dealer-badge">庄</span>' : '';
+            nameEl.innerHTML = escapeHtmlLocal(player.id || '我的手牌') + dealerBadge;
+          }
+        }
+        if (scoreEl) {
+          const chips = `筹码: ${(state.cumulative_scores || {})[player.id] ?? '–'}`;
+          if (scoreEl.textContent !== chips) scoreEl.textContent = chips;
+        }
+
+        if (handEl) {
+          const newTiles    = sortHandTiles(getHandTiles(player));
+          const winTile     = state.winning_tile || null;
+          const isWinner    = state.winner && player.id === state.winner;
+          const revealSuffix = window._endReveal ? '|reveal|' + (winTile || '') : '';
+          const newTilesKey  = newTiles.join(',') + revealSuffix;
+
+          if (handEl.dataset.tilesKey !== newTilesKey) {
+            handEl.dataset.tilesKey = newTilesKey;
+            delete handEl.dataset.selectedTile;
+            handEl.innerHTML = '';
+            if (window._endReveal) {
+              let winMarked = false;
+              newTiles.forEach(tileStr => {
+                const isWin = !winMarked && isWinner && tileStr === winTile;
+                if (isWin) winMarked = true;
+                handEl.appendChild(makeTileEl(tileStr, { winning: isWin }));
+              });
+            } else {
+              newTiles.forEach(tileStr => {
+                handEl.appendChild(makeTileEl(tileStr, { clickable: true }));
+              });
+            }
+          }
+
+          if (!window._endReveal) {
+            const selKey = selectedTile || '';
+            if (handEl.dataset.selectedTile !== selKey) {
+              handEl.dataset.selectedTile = selKey;
+              handEl.querySelectorAll('.tile').forEach(el => {
+                el.classList.toggle('selected', el.dataset.tile === selectedTile);
+              });
+            }
+          }
+        }
+
+        if (meldsEl) {
+          const newMeldsKey = JSON.stringify([...(player.melds || []), ...(player.flowers || [])]);
+          if (meldsEl.dataset.meldsKey !== newMeldsKey) {
+            meldsEl.dataset.meldsKey = newMeldsKey;
+            meldsEl.innerHTML = '';
+            (player.melds || []).forEach(meld => {
+              const group = document.createElement('span');
+              group.className = 'meld-group';
+              meld.forEach(t => group.appendChild(makeTileEl(t)));
+              meldsEl.appendChild(group);
+            });
+            (player.flowers || []).forEach(t => {
+              const el = makeTileEl(t);
+              el.style.marginLeft = '3px';
+              meldsEl.appendChild(el);
+            });
+          }
+        }
+
+        const bottomArea = document.getElementById('area-bottom');
+        if (bottomArea) {
+          const shouldBeActive = state.current_turn === playerIdx;
+          if (bottomArea.classList.contains('active-turn') !== shouldBeActive) {
+            bottomArea.classList.toggle('active-turn', shouldBeActive);
+          }
+        }
+      };
+
+      /* ── renderMyHand ───────────────────────────────────────
+         渲染自己的手牌区域: 标签 + 手牌 + 副露 + 花牌
+      ─────────────────────────────────────────────────────────── */
+      window.renderMyHand = function(player, playerIdx, state) {
+        const handEl  = document.getElementById('my-hand');
+        const meldsEl = document.getElementById('my-melds');
+        const nameEl  = document.getElementById('my-player-name');
+        const scoreEl = document.getElementById('my-player-score');
+
+        // 玩家名称和筹码
+        if (nameEl) {
+          const isDealer = state.dealer_idx === playerIdx;
+          const nameKey  = `${player.id}|${isDealer}`;
+          if (nameEl.dataset.nameKey !== nameKey) {
+            nameEl.dataset.nameKey = nameKey;
+            const dealerBadge = isDealer ? '<span class="dealer-badge">庄</span>' : '';
+            nameEl.innerHTML = escapeHtmlLocal(player.id || '我的手牌') + dealerBadge;
+          }
+        }
+        if (scoreEl) {
+          const chips = `筹码: ${(state.cumulative_scores || {})[player.id] ?? '–'}`;
+          if (scoreEl.textContent !== chips) scoreEl.textContent = chips;
+        }
+
+        // 手牌
+        if (handEl) {
+          const newTiles    = sortHandTiles(getHandTiles(player));
+          const winTile     = state.winning_tile || null;
+          const isWinner    = state.winner && player.id === state.winner;
+          const revealSuffix = window._endReveal ? '|reveal|' + (winTile || '') : '';
+          const newTilesKey  = newTiles.join(',') + revealSuffix;
+
+          if (handEl.dataset.tilesKey !== newTilesKey) {
+            handEl.dataset.tilesKey = newTilesKey;
+            delete handEl.dataset.selectedTile;
+            handEl.innerHTML = '';
+
+            if (window._endReveal) {
+              // 结算时显示所有手牌
+              let winMarked = false;
+              newTiles.forEach(tileStr => {
+                const isWin = !winMarked && isWinner && tileStr === winTile;
+                if (isWin) winMarked = true;
+                handEl.appendChild(makeTileEl(tileStr, { winning: isWin }));
+              });
+            } else {
+              // 正常游戏显示可点击的手牌
+              newTiles.forEach(tileStr => {
+                handEl.appendChild(makeTileEl(tileStr, { clickable: true }));
+              });
+            }
+          }
+
+          // 选中状态
+          if (!window._endReveal) {
+            const selKey = selectedTile || '';
+            if (handEl.dataset.selectedTile !== selKey) {
+              handEl.dataset.selectedTile = selKey;
+              handEl.querySelectorAll('.tile').forEach(el => {
+                el.classList.toggle('selected', el.dataset.tile === selectedTile);
+              });
+            }
+          }
+        }
+
+        // 副露和花牌
+        if (meldsEl) {
+          const newMeldsKey = JSON.stringify([...(player.melds || []), ...(player.flowers || [])]);
+          if (meldsEl.dataset.meldsKey !== newMeldsKey) {
+            meldsEl.dataset.meldsKey = newMeldsKey;
+            meldsEl.innerHTML = '';
+
+            // 副露组
+            (player.melds || []).forEach(meld => {
+              const group = document.createElement('span');
+              group.className = 'meld-group';
+              meld.forEach(t => group.appendChild(makeTileEl(t)));
+              meldsEl.appendChild(group);
+            });
+
+            // 花牌
+            (player.flowers || []).forEach(t => {
+              const el = makeTileEl(t);
+              el.style.marginLeft = '3px';
+              meldsEl.appendChild(el);
+            });
+          }
+        }
+
+        // 轮到自己的高亮
+        const bottomArea = document.getElementById('area-bottom');
+        if (bottomArea) {
+          const shouldBeActive = state.current_turn === playerIdx;
+          if (bottomArea.classList.contains('active-turn') !== shouldBeActive) {
+            bottomArea.classList.toggle('active-turn', shouldBeActive);
+          }
+        }
+      };
+
+    })();
+  </script>
+</body>
+</html>

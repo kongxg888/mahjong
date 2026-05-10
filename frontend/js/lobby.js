@@ -11,10 +11,11 @@ let refreshTimer = null;
 
 /* ---------- Initialisation ---------- */
 function init() {
-  playerId = localStorage.getItem('mahjong_player_id');
+  playerId = localStorage.getItem('mahjong_player');
   if (!playerId) {
-    playerId = 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-    localStorage.setItem('mahjong_player_id', playerId);
+    // 未登录，跳转到登录页
+    location.href = 'login.html?next=lobby.html';
+    return;
   }
 
   const pidEl = document.getElementById('player-id-display');

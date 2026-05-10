@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>排行榜 — 温州麻将</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base:        #18261E;
+      --bg-base-alt:    #1a2e22;
+      --gold:           #D4AF37;
+      --gold-light:     #E8C962;
+      --gold-dim:       rgba(212,175,55,0.12);
+      --gold-border:    rgba(212,175,55,0.28);
+      --ink:            #F5F5DC;
+      --ink-muted:      rgba(245,245,220,0.68);
+      --ink-faint:      rgba(255,255,255,0.40);
+      --glass-bg:       rgba(0,0,0,0.42);
+      --glass-border:   rgba(212,175,55,0.28);
+      --glass-blur:     blur(10px) saturate(140%);
+      --radius-sm:   6px; --radius-md:  12px; --radius-lg:  18px;
+      --radius-xl:  24px; --radius-full: 9999px;
+      --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --duration-fast:   120ms; --duration-normal: 220ms;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-color: var(--bg-base);
+      background-image: radial-gradient(rgba(212,175,55,0.06) 1px, transparent 1px);
+      background-size: 26px 26px;
+      color: var(--ink);
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: calc(var(--safe-bottom) + 90px);
+    }
+    .header {
+      position: sticky; top: 0; z-index: 50;
+      padding: var(--radius-md) var(--radius-lg) calc(var(--radius-md) + env(safe-area-inset-top, 0px));
+      padding-top: calc(var(--radius-md) + env(safe-area-inset-top, 0px));
+      background: rgba(0,0,0,0.60);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      border-bottom: 1px solid rgba(212,175,55,0.20);
+      display: flex; align-items: center; justify-content: space-between; gap: var(--radius-md);
+    }
+    .header-title { font-family: 'Noto Serif SC', serif; font-size: 1.1rem; font-weight: 700; color: var(--gold); letter-spacing: 0.06em; flex: 1; text-align: center; }
+    .page { padding: var(--radius-lg); max-width: 480px; margin: 0 auto; }
+    .page-title { font-family: 'Noto Serif SC', serif; font-size: 1.4rem; font-weight: 900; color: var(--ink); margin-bottom: 4px; }
+    .page-sub { font-size: 0.78rem; color: var(--ink-muted); margin-bottom: var(--radius-xl); }
+    .top-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--radius-md); margin-bottom: var(--radius-xl); align-items: flex-end; }
+    .rank-card { background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: var(--radius-md); text-align: center; }
+    .rank-card--2 { padding-top: var(--radius-xl); }
+    .rank-card--3 { padding-top: var(--radius-md); }
+    .rank-medal { font-size: 1.6rem; margin-bottom: 4px; display: block; }
+    .rank-card--1 { border-color: rgba(212,175,55,0.55); box-shadow: 0 0 20px rgba(212,175,55,0.15); }
+    .rank-card--1 .rank-medal { font-size: 2rem; }
+    .rank-name { font-size: 0.80rem; font-weight: 700; color: var(--ink); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .rank-chips { font-family: 'Noto Serif SC', serif; font-size: 1.1rem; font-weight: 900; color: var(--gold); display: block; margin-bottom: 4px; }
+    .rank-meta { font-size: 0.62rem; color: var(--ink-muted); display: block; }
+    .rank-meta strong { color: var(--gold); }
+    .section-title { font-size: 0.72rem; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: var(--radius-md); display: flex; align-items: center; gap: var(--radius-sm); }
+    .section-title::before { content: ''; display: block; width: 3px; height: 1em; background: var(--gold); border-radius: 2px; }
+    .rank-row { display: flex; align-items: center; gap: var(--radius-md); padding: var(--radius-md); background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); margin-bottom: var(--radius-sm); }
+    .rank-row__num { font-family: 'Noto Serif SC', serif; font-size: 1rem; font-weight: 900; color: var(--ink-muted); min-width: 28px; text-align: center; }
+    .rank-row__avatar { width: 36px; height: 36px; border-radius: 50%; background: rgba(45,90,61,0.5); border: 1px solid var(--gold-border); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: var(--gold); flex-shrink: 0; }
+    .rank-row__info { flex: 1; min-width: 0; }
+    .rank-row__name { font-size: 0.82rem; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rank-row__meta { font-size: 0.68rem; color: var(--ink-muted); }
+    .rank-row__chips { font-family: 'Noto Serif SC', serif; font-size: 0.95rem; font-weight: 900; color: var(--gold); flex-shrink: 0; }
+    .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; gap: var(--radius-md); color: var(--ink-muted); font-size: 0.85rem; }
+    .spinner { width: 32px; height: 32px; border: 2px solid rgba(212,175,55,0.2); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--radius-xl) var(--radius-lg); text-align: center; gap: var(--radius-md); }
+    .empty-state__icon { font-size: 3rem; opacity: 0.4; }
+    .empty-state__title { font-family: 'Noto Serif SC', serif; font-size: 1rem; color: var(--ink-muted); }
+    .toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.80); backdrop-filter: blur(8px); color: var(--ink); padding: 10px 22px; border-radius: 9999px; font-size: 0.82rem; z-index: 999; pointer-events: none; white-space: nowrap; border: 1px solid rgba(255,255,255,0.10); animation: toastIn 0.25s var(--ease-out) both; }
+    @keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(-8px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+    .toast.fade-out { animation: toastOut 0.3s ease both; }
+    @keyframes toastOut { to { opacity:0; transform: translateX(-50%) translateY(-8px); } }
+    .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-around; padding: var(--radius-sm) env(safe-area-inset-bottom, var(--radius-sm)); padding-bottom: calc(var(--radius-sm) + env(safe-area-inset-bottom, 0px)); background: rgba(0,0,0,0.50); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border-top: 1px solid rgba(212,175,55,0.25); }
+    .tab-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--radius-sm) var(--radius-md); border-radius: var(--radius-md); cursor: pointer; transition: background var(--duration-fast), transform var(--duration-fast); min-width: 60px; -webkit-tap-highlight-color: transparent; }
+    .tab-item:active { transform: scale(0.90); background: rgba(255,255,255,0.06); }
+    .tab-item--active .tab-icon { transform: translateY(-2px); }
+    .tab-icon { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; transition: transform var(--duration-normal) var(--ease-spring); }
+    .tab-icon svg { width: 100%; height: 100%; }
+    .tab-label { font-size: 0.62rem; font-weight: 500; color: var(--ink-muted); transition: color var(--duration-fast); letter-spacing: 0.02em; }
+    .tab-item--active .tab-label { color: var(--gold); font-weight: 600; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <span class="header-title">排行榜</span>
+  </header>
+
+  <div class="page">
+    <div class="page-title">实力排行</div>
+    <div class="page-sub">按当前筹码排序，每局结束后实时更新</div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <span>加载排名中…</span>
+    </div>
+
+    <div id="content" class="hidden">
+      <div class="top-3" id="top-3"></div>
+      <div class="section-title">完整排行</div>
+      <div id="rest-list"></div>
+    </div>
+
+    <div id="empty" class="empty-state hidden">
+      <div class="empty-state__icon">🏆</div>
+      <div class="empty-state__title">暂无排行数据</div>
+    </div>
+  </div>
+
+  <nav class="tab-bar" aria-label="主导航">
+    <div class="tab-item" onclick="location.href='index.html'" role="tab">
+      <div class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg></div>
+      <span class="tab-label">大厅</span>
+    </div>
+    <div class="tab-item" onclick="location.href='records.html'" role="tab">
+      <div class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="14" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="19" rx="1"/></svg></div>
+      <span class="tab-label">战绩</span>
+    </div>
+    <div class="tab-item" onclick="location.href='tournaments.html'" role="tab">
+      <div class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 010-5C7 4 7 7 7 7"/><path d="M18 9h1.5a2.5 2.5 0 000-5C17 4 17 7 17 7"/><path d="M4 22h16"/><path d="M10 22V8a4 4 0 00-4-4H6"/><path d="M14 22V8a4 4 0 014-4h0"/><path d="M8 6h8l2 4H6L8 6z"/></svg></div>
+      <span class="tab-label">比赛场</span>
+    </div>
+    <div class="tab-item tab-item--active" role="tab">
+      <div class="tab-icon" style="color:var(--gold)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+      <span class="tab-label" style="color:var(--gold)">排行</span>
+    </div>
+    <div class="tab-item" onclick="location.href='profile.html'" role="tab">
+      <div class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+      <span class="tab-label">我的</span>
+    </div>
+  </nav>
+
+  <script>
+    const API = '/api';
+
+    function toast(msg) {
+      const old = document.getElementById('toast');
+      if (old) old.remove();
+      const t = document.createElement('div');
+      t.id = 'toast'; t.className = 'toast'; t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => { t.classList.add('fade-out'); setTimeout(() => t.remove(), 300); }, 2200);
+    }
+
+    function medalEmoji(rank) { return ['🥇','🥈','🥉'][rank] || ''; }
+
+    async function load() {
+      try {
+        const res = await fetch(API + '/leaderboard');
+        if (!res.ok) throw new Error('加载失败');
+        const data = await res.json();
+        render(data);
+      } catch(e) {
+        console.error(e);
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('empty').classList.remove('hidden');
+      }
+    }
+
+    function render(data) {
+      document.getElementById('loading').classList.add('hidden');
+      if (!data.length) {
+        document.getElementById('empty').classList.remove('hidden');
+        return;
+      }
+      document.getElementById('content').classList.remove('hidden');
+
+      // Top 3 special layout: 2nd | 1st | 3rd
+      const top3 = data.slice(0, 3);
+      const top3ordered = [top3[1], top3[0], top3[2]].filter(Boolean); // 2nd, 1st, 3rd
+      const medals = ['🥈','🥇','🥉'];
+
+      document.getElementById('top-3').innerHTML = top3ordered.map((p, i) => {
+        const actualRank = i === 0 ? 2 : i === 1 ? 1 : 3;
+        return `
+          <div class="rank-card rank-card--${actualRank}">
+            <span class="rank-medal">${medals[i]}</span>
+            <span class="rank-name">${esc(p.name || p.id)}</span>
+            <span class="rank-chips">${(p.chips || 0).toLocaleString()}</span>
+            <span class="rank-meta">胜率 <strong>${p.win_rate || 0}%</strong></span>
+            <span class="rank-meta">${p.games_played || 0} 局</span>
+          </div>`;
+      }).join('');
+
+      document.getElementById('rest-list').innerHTML = data.slice(3).map((p, i) => {
+        const rank = i + 4;
+        const initial = (p.name || p.id || '?').charAt(0).toUpperCase();
+        return `
+          <div class="rank-row">
+            <span class="rank-row__num">${rank}</span>
+            <div class="rank-row__avatar">${esc(initial)}</div>
+            <div class="rank-row__info">
+              <div class="rank-row__name">${esc(p.name || p.id)}</div>
+              <div class="rank-row__meta">${p.games_played || 0}局 · 胜率 ${p.win_rate || 0}%</div>
+            </div>
+            <span class="rank-row__chips">${(p.chips || 0).toLocaleString()}</span>
+          </div>`;
+      }).join('');
+    }
+
+    function esc(s) { if(s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    load();
+  </script>
+</body>
+</html>
